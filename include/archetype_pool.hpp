@@ -23,7 +23,6 @@ namespace peetcs
 		std::size_t archetype_hash;
 	};
 
-
 	struct archetype_pool
 	{
 		std::unordered_map<archetype_id, archetype_block, archetype_hash> blocks;
@@ -251,5 +250,4 @@ namespace peetcs
 			return component_query<Components...>(*this);
 		}
 	};
-
 }

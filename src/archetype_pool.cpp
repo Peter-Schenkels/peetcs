@@ -108,8 +108,5 @@ namespace peetcs
 			blocks[old_archetype_id].remove_entity(command.target);
 			entity_archetype_lookup.erase(command.target);
 		}
-
-		
-
 	}
 }

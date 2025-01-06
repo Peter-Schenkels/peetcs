@@ -6,18 +6,20 @@ namespace peetcs
 {
 	void archetype_pool::emplace_commands()
 	{
-		for (auto& entity_commands : add_commands | std::views::values)
+		for (const auto& add_command : add_commands)
 		{
-			for (auto& component_commands : entity_commands | std::views::values)
-			{
-				for (auto add_command : component_commands)
-				{
-					execute_add(add_command.target, add_command.component_data, add_command.component_type, add_command.component_size);
-					free(add_command.component_data);
-
-				}
-			}
+			execute_add(add_command.target, add_command.component_data, add_command.component_type, add_command.component_size);
+			free(add_command.component_data);
 		}
+
+		add_commands.clear();
+
+		for (const auto& remove_command : remove_commands)
+		{
+			execute_remove(remove_command);
+		}
+
+		remove_commands.clear();
 	}
 
 	void archetype_pool::execute_add(entity_id entity, void* data, std::type_index component_type,
@@ -78,5 +80,36 @@ namespace peetcs
 
 			old_block_it->second.remove_entity(entity);
 		}
+	}
+
+	void archetype_pool::execute_remove(const remove_component_command& command)
+	{
+		archetype_id& old_archetype_id = entity_archetype_lookup[command.target];
+		archetype_id new_archetype_id = old_archetype_id;
+		new_archetype_id.remove_type(command.component_type);
+
+		if (new_archetype_id.get_size_of_element() > 0)
+		{
+			storage::region old_region = blocks[old_archetype_id].get_entity(command.target);
+
+			if (!blocks.contains(new_archetype_id))
+			{
+				blocks[new_archetype_id] = archetype_block{ new_archetype_id };
+			}
+
+			storage::region new_region = blocks[new_archetype_id].add_entity(command.target);
+			new_archetype_id.migrate(new_region, old_region, old_archetype_id);
+
+			blocks[old_archetype_id].remove_entity(command.target);
+			entity_archetype_lookup[command.target] = new_archetype_id;
+		}
+		else
+		{
+			blocks[old_archetype_id].remove_entity(command.target);
+			entity_archetype_lookup.erase(command.target);
+		}
+
+		
+
 	}
 }

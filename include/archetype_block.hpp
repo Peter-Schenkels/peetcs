@@ -30,11 +30,11 @@ namespace peetcs
 		class iterator
 		{
 		public:
-			using iterator_category = std::forward_iterator_tag; // Iterator type (e.g., forward, bidirectional, etc.)
+			using iterator_category = std::forward_iterator_tag; // Iterator type_id (e.g., forward, bidirectional, etc.)
 			using value_type = storage::iterator;                                // Type of the elements
 			using difference_type = std::ptrdiff_t;              // Type for representing differences between iterators
-			using pointer = storage::iterator*;                                  // Pointer to the element type
-			using reference = storage::iterator&;                                // Reference to the element type
+			using pointer = storage::iterator*;                                  // Pointer to the element type_id
+			using reference = storage::iterator&;                                // Reference to the element type_id
 
 			storage::iterator it;
 

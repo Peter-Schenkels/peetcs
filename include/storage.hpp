@@ -1,5 +1,8 @@
 #pragma once
+#include <typeindex>
 #include <vector>
+
+#include "peetcs_types.hpp"
 
 namespace peetcs
 {
@@ -7,12 +10,15 @@ namespace peetcs
 	{
 	public:
 		typedef std::uint8_t storage_type;
+		static constexpr size_t padding_element_type = 6;
+		static constexpr size_t padding_nb_of_element = 1;
 
 	private:
 		std::vector<storage_type> data;
 
 		std::size_t element_size;
 		std::size_t element_index;
+		std::size_t padding_index_end;
 
 	public:
 		struct region
@@ -20,10 +26,11 @@ namespace peetcs
 			size_t index;
 			std::size_t element_size;
 			void* data;
+			void* storage_start;
 		};
 
 		storage();
-		storage(std::size_t element_size, std::size_t number_of_elements);
+		storage(const std::vector<peetcs::type_info>& type_description, std::size_t number_of_elements);
 
 		region add_element();
 
@@ -59,7 +66,6 @@ namespace peetcs
 			region operator*() const;
 
 			region operator->() const;
-
 
 			bool operator==(const iterator& other) const;
 

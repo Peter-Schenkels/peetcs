@@ -68,10 +68,13 @@ int main()
 
 	// New system tick
 	{
+		// Add command: Remove <health> from entity 2 ->  results in: archetype <Position> migration
+		pool.remove<health>(2);
+
 		// Get position from <position, health> table (Still expensive but cheaper depending on context)
 		pool.emplace_commands();
 
-		auto query = pool.query<position>();
+		auto query = pool.query<position, health>();
 
 		for (peetcs::query_value query_value : query)
 		{

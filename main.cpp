@@ -1,13 +1,12 @@
-#include <algorithm>
-#include <string>
+#include <iostream>
 
-#include "ecs.hpp"
+#include "include/archetype_pool.hpp"
+#include "include/query_value.hpp"
 
 struct component_test
 {
 	float test = 1;
 };
-
 
 struct position
 {
@@ -23,7 +22,7 @@ struct health
 
 int main()
 {
-	archetype_pool pool;
+	peetcs::archetype_pool pool;
 
 
 	// System tick

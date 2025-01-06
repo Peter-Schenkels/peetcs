@@ -20,15 +20,15 @@ include(CMake/AddProjectMacro/Macros.cmake)
 
 
 
-# FILE GROUP SRC_BABECS_-_NEW
-set(SRC_BABECS_-_NEW
+# FILE GROUP SRC_PEETCS
+set(SRC_PEETCS
 	"cmakegen.exe"
 	"CMakeLists.txt"
-	"ecs.hpp"
 	"main.cpp"
+	"README.md"
 )
 
-source_group("BabECS - New" FILES ${SRC_BABECS_-_NEW})
+source_group("PeetCS" FILES ${SRC_PEETCS})
 
 
 # FILE GROUP SRC_CMAKEGEN
@@ -39,14 +39,39 @@ set(SRC_CMAKEGEN
 source_group("CMakeGen" FILES ${SRC_CMAKEGEN})
 
 
-# LIBRARY GROUP BabECS - New
-set(SRC_LIB_BABECS_-_NEW ${SRC_BABECS_-_NEW} ${SRC_CMAKEGEN} )
+# FILE GROUP SRC_INCLUDE
+set(SRC_INCLUDE
+	"include/archetype_block.hpp"
+	"include/archetype_id.hpp"
+	"include/archetype_pool.hpp"
+	"include/peetcs_types.hpp"
+	"include/query_value.hpp"
+	"include/storage.hpp"
+)
+
+source_group("include" FILES ${SRC_INCLUDE})
+
+
+# FILE GROUP SRC_SRC
+set(SRC_SRC
+	"src/archetype_block.cpp"
+	"src/archetype_id.cpp"
+	"src/archetype_pool.cpp"
+	"src/query_value.cpp"
+	"src/storage.cpp"
+)
+
+source_group("src" FILES ${SRC_SRC})
+
+
+# LIBRARY GROUP PeetCS
+set(SRC_LIB_PEETCS ${SRC_PEETCS} ${SRC_CMAKEGEN} ${SRC_INCLUDE} ${SRC_SRC} )
 
 
 # define the target
-add_project(BABECS_-_NEW
+add_project(PEETCS
             COMMAND
-            SOURCES ${SRC_LIB_BABECS_-_NEW}
+            SOURCES ${SRC_LIB_PEETCS}
             DEPENDS )
 
 

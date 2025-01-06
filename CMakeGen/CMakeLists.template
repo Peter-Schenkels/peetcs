@@ -1,0 +1,41 @@
+
+#header directory
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
+message("Headers: ${CMAKE_CURRENT_SOURCE_DIR}")
+
+cmake_minimum_required(VERSION 3.5)
+
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+include(CMake/AddProjectMacro/Macros.cmake)
+###############################
+# Add all sources and headers #
+##############################
+
+
+$#
+
+$#
+
+# FILE GROUP $<$(SOURCE_GROUP_NAME)$>$
+set($<$(SOURCE_GROUP_NAME)$>$$<
+	"$[SOURCE_GROUP_FILE_PATH]$">$
+)
+
+source_group($<"$(SOURCE_GROUP_NAME_EDITOR)$" FILES ${$(SOURCE_GROUP_NAME)$}>$)
+#$
+
+# LIBRARY GROUP $<$(LIBRARY_NAME)$>$
+set($<SRC_LIB_$(LIBRARY_NAME_CMAKE)$>$ $<${$[SOURCE_GROUP_NAMES]$} >$)
+
+
+# define the target
+add_project($(LIBRARY_NAME_CMAKE)$
+            $(LIBRARY_TYPE)$
+            SOURCES ${SRC_LIB_$(LIBRARY_NAME_CMAKE)$}
+            DEPENDS $<$[LIBRARY_DEPENDENCY]$ >$)
+
+#$

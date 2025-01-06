@@ -11,7 +11,7 @@ namespace peetcs
 
 	void archetype_id::init(std::type_index type, std::size_t type_size)
 	{
-		type_indices = { type_info_size{ type, type_size } };
+		type_indices = { type_info{ type, type_size } };
 		element_size = type_size;
 
 		dirty = true;
@@ -23,7 +23,7 @@ namespace peetcs
 	{
 		for (auto type_index : type_indices)
 		{
-			if (type_index.type == type_id)
+			if (type_index.type_id == type_id)
 			{
 				return true;
 			}
@@ -36,14 +36,14 @@ namespace peetcs
 	{
 		if (dirty)
 		{
-			std::ranges::sort(type_indices, [](const type_info_size& a, const type_info_size& b) {
-				return a.type.hash_code() < b.type.hash_code();
+			std::ranges::sort(type_indices, [](const type_info& a, const type_info& b) {
+				return a.type_id.hash_code() < b.type_id.hash_code();
 			});
 
 			hash = 0;
 			for (const auto& typeIndex : type_indices)
 			{
-				hash ^= std::hash<std::size_t>()(typeIndex.type.hash_code());
+				hash ^= std::hash<std::size_t>()(typeIndex.type_id.hash_code());
 			}
 
 			dirty = false;
@@ -66,7 +66,7 @@ namespace peetcs
 	{
 		for (auto type_index : type_indices)
 		{
-			if (type_index.type == type)
+			if (type_index.type_id == type)
 			{
 				return;
 			}
@@ -79,6 +79,26 @@ namespace peetcs
 		get_hash();
 	}
 
+	void archetype_id::remove_type(const std::type_index& type_id)
+	{
+		auto it = type_indices.begin();
+		for (; it != type_indices.end(); ++it)
+		{
+			if (it->type_id == type_id)
+			{
+				element_size -= it->size_of;
+				break;
+			}
+		}
+
+		if (it != type_indices.end())
+		{
+			type_indices.erase(it);
+			dirty = true;
+			get_hash();
+		}
+	}
+
 	size_t archetype_id::get(const std::type_index& type)
 	{
 		if (dirty) [[unlikely]]
@@ -89,7 +109,7 @@ namespace peetcs
 		int index = 0;
 		for (auto& type_index : type_indices)
 		{
-			if (type_index.type == type)
+			if (type_index.type_id == type)
 			{
 				return index;
 			}
@@ -144,14 +164,14 @@ namespace peetcs
 		{
 			for (auto type_index_src : src_memory_descriptor.type_indices)
 			{
-				if (type_index_dst.type == type_index_src.type)
+				if (type_index_dst.type_id == type_index_src.type_id)
 				{
 					if (type_index_dst.size_of != type_index_src.size_of)
 					{
 						__debugbreak();
 					}
 
-					set_component_ptr(type_index_dst.type, src_memory_descriptor.get_component_ptr(type_index_dst.type, src_region), dst_region);
+					set_component_ptr(type_index_dst.type_id, src_memory_descriptor.get_component_ptr(type_index_dst.type_id, src_region), dst_region);
 				}
 			}
 		}
@@ -165,5 +185,15 @@ namespace peetcs
 		}
 
 		return hash == other.hash && hash == other.hash;
+	}
+
+	size_t archetype_hash::operator()(const archetype_id& obj) const
+	{
+		return obj.get_hash();
+	}
+
+	size_t archetype_hash::operator()(const std::size_t& obj) const
+	{
+		return obj;
 	}
 }

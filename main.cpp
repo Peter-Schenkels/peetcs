@@ -69,10 +69,11 @@ int main()
 	// New system tick
 	{
 		// Get position from <position, health> table (Still expensive but cheaper depending on context)
+		pool.emplace_commands();
 
-		auto query = pool.query<position, health>();
+		auto query = pool.query<position>();
 
-		for (auto query_value : query)
+		for (peetcs::query_value query_value : query)
 		{
 			position& position_data = query_value.get<position>();
 			std::cout << position_data.x << " " << position_data.y << " " << position_data.z << " " << std::endl;

@@ -3,7 +3,7 @@
 namespace peetcs
 {
 	archetype_block::archetype_block(const archetype_id& id):
-		block(id.get_size_of_element(), 1000),
+		block(id.type_indices, 1000),
 		archetype_info(id)
 	{
 	}
@@ -31,14 +31,16 @@ namespace peetcs
 
 		size_t last_entity = block.last();
 		block.remove_element(entity_it->second);
-		entity_index_map.erase(entity_it);
+		entity_index_map.erase(entity_it->first);
 
+		bool is_last = true;
 		for (auto& element : entity_index_map)
 		{
 			// Move last to deleted entity index
 			if (element.second == last_entity)
 			{
 				entity_index_map[element.first] = entity_it->second;
+				is_last = false;
 			}
 		}
 	}

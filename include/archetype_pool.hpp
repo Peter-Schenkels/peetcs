@@ -16,61 +16,66 @@ namespace peetcs
 		void* component_data;
 	};
 
+	struct remove_component_command
+	{
+		entity_id target;
+		std::type_index component_type;
+		std::size_t archetype_hash;
+	};
+
 
 	struct archetype_pool
 	{
 		std::unordered_map<archetype_id, archetype_block, archetype_hash> blocks;
 		std::unordered_map<entity_id, archetype_id> entity_archetype_lookup;
-		std::unordered_map<entity_id, std::unordered_map<std::type_index, std::vector<add_component_command>>> add_commands;
+		std::vector<add_component_command> add_commands;
+		std::vector<remove_component_command> remove_commands;
 
 		template<typename Component>
-		Component& add(entity_id entity)
+		Component& add(const entity_id entity)
 		{
 			add_component_command command = {
-				entity,
-				typeid(Component),
-				sizeof(Component),
-				malloc(sizeof(Component))
+				.target= entity,
+				.component_type= typeid(Component),
+				.component_size= sizeof(Component),
+				.component_data= malloc(sizeof(Component))
 			};
 
 			*static_cast<Component*>(command.component_data) = Component{};
 
-			add_commands[entity][command.component_type].push_back(command);
-			return *static_cast<Component*>(add_commands[entity][command.component_type].back().component_data);
+			add_commands.push_back(command);
+			return *static_cast<Component*>(add_commands.back().component_data);
 		}
 
 		template<typename Component>
-		Component* get(entity_id entity)
+		Component* get(const entity_id entity)
 		{
+			const auto& component_type = typeid(Component);
+
 			// Scenario 1 (Component is in an archetype)
 			auto archetype_it = entity_archetype_lookup.find(entity);
 			if (archetype_it != entity_archetype_lookup.end())
 			{
-				if (archetype_it->second.contains(typeid(Component)))
+				if (archetype_it->second.contains(component_type))
 				{
 					archetype_id& memory_accesor = archetype_it->second;
 
 					auto& block = blocks[memory_accesor];
 					storage::region region = block.get_entity(entity);
-					void* component_data = memory_accesor.get_component_ptr(typeid(Component), region);
+					void* component_data = memory_accesor.get_component_ptr(component_type, region);
 					return static_cast<Component*>(component_data);
 				}
 			}
 
 			// Scenario 2 (Component is not in an archetype)
-			auto entity_command_it = add_commands.find(entity);
-			if (entity_command_it != add_commands.end())
+			for (const auto& add_command : add_commands)
 			{
-				auto component_command_it = entity_command_it->second.find(typeid(Component));
-				if (component_command_it != entity_command_it->second.end())
+				if (add_command.target == entity && add_command.component_type == component_type)
 				{
-					auto& commands = component_command_it->second;
-					if (!commands.empty())
-					{
-						return static_cast<Component*>(commands.front().component_data);
-					}
+					return static_cast<Component*>(add_command.component_data);
 				}
 			}
+
 
 			// Scenario 3 (Entity or component does not exist)
 			return nullptr;
@@ -79,6 +84,7 @@ namespace peetcs
 		void emplace_commands();
 
 		void execute_add(entity_id entity, void* data, std::type_index component_type, std::size_t component_size);
+		void execute_remove(const remove_component_command& command);
 
 		template<typename ... Components>
 		void get_archetypes_with(std::vector<archetype_id>& archetypes)
@@ -90,6 +96,32 @@ namespace peetcs
 					archetypes.push_back(archetype_id);
 				}
 			}
+		}
+
+		template<typename Component>
+		bool has(const entity_id entity)
+		{
+			auto archetype_it = entity_archetype_lookup.find(entity);
+			if (archetype_it != entity_archetype_lookup.end())
+			{
+				return archetype_it->second.contains(typeid(Component));
+			}
+
+			return false;
+		}
+
+		template<typename Component>
+		void remove(entity_id entity)
+		{
+			auto& id = entity_archetype_lookup[entity];
+
+			remove_component_command command = {
+				.target = entity,
+				.component_type = typeid(Component),
+				.archetype_hash = id.get_hash(),
+			};
+
+			remove_commands.push_back(command);
 		}
 
 		template<typename ... Components>
@@ -109,11 +141,11 @@ namespace peetcs
 			class iterator
 			{
 			public:
-				using iterator_category = std::forward_iterator_tag; // Iterator type (e.g., forward, bidirectional, etc.)
+				using iterator_category = std::forward_iterator_tag; // Iterator type_id (e.g., forward, bidirectional, etc.)
 				using value_type = query_value;                                // Type of the elements
 				using difference_type = std::ptrdiff_t;              // Type for representing differences between iterators
-				using pointer = query_value*;                                  // Pointer to the element type
-				using reference = query_value&;                                // Reference to the element type
+				using pointer = query_value*;                                  // Pointer to the element type_id
+				using reference = query_value&;                                // Reference to the element type_id
 
 				std::vector<archetype_id>::iterator archetype_it;
 				std::vector<archetype_id>::iterator archetype_it_end;
@@ -121,13 +153,30 @@ namespace peetcs
 				storage::iterator block_it_end;
 				component_query& target_query;
 
-				iterator(component_query& query) :
+				explicit iterator(component_query& query) :
 					archetype_it(query.archetype_traversal.begin()),
 					archetype_it_end(query.archetype_traversal.end()),
 					block_it(*query.pool.blocks[*archetype_it].begin()),
 					block_it_end(*query.pool.blocks[*archetype_it].end()),
 					target_query(query)
 				{
+					if (block_it == block_it_end)
+					{
+						++archetype_it;
+						while (archetype_it != archetype_it_end)
+						{
+							block_it = *query.pool.blocks[*archetype_it].begin();
+							block_it_end = *query.pool.blocks[*archetype_it].end();
+
+							if (block_it != block_it_end)
+							{
+								break;
+							}
+
+							++archetype_it;
+						}
+					}
+
 				}
 
 				iterator(component_query& query,

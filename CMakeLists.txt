@@ -22,7 +22,6 @@ include(CMake/AddProjectMacro/Macros.cmake)
 
 # FILE GROUP SRC_PEETCS
 set(SRC_PEETCS
-	"cmakegen.exe"
 	"CMakeLists.txt"
 	"main.cpp"
 	"README.md"

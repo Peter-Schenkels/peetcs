@@ -53,7 +53,7 @@ pool.emplace_commands();
 
 #### Query Components:  
 ```cpp
-auto query = pool.query<position, cool_data>();
+auto query = pool.query<position, health>();
 
 for (auto q : query) {
     position& pos = q.get<position>();

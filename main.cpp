@@ -1,85 +1,108 @@
 #include <iostream>
-
+#include <chrono>
 #include "include/archetype_pool.hpp"
-#include "include/query_value.hpp"
-
-struct component_test
-{
-	float test = 1;
-};
 
 struct position
 {
-	float x = 2;
-	float y = 31;
-	float z = 1;
+	float x, y, z;
+};
+
+struct velocity
+{
+	float vx, vy, vz;
 };
 
 struct health
 {
-	int points = 100;
+	int points;
+};
+
+struct attack
+{
+	int damage;
+};
+
+struct defense
+{
+	int armor;
 };
 
 int main()
 {
+	constexpr int entity_count = 100000; // Number of entities for the test
 	peetcs::archetype_pool pool;
 
-
-	// System tick
+	// Measure time for adding components
+	auto start = std::chrono::high_resolution_clock::now();
+	for (int i = 0; i < entity_count; ++i)
 	{
-		// Creates: Add <Position> command with temp data -> results in: archetype <Position> creation
-		position& position_data_0   = pool.add<position>(0);
-		position_data_0.x = 0;
-		position_data_0.y = 0;
-		position_data_0.z = 0;
+		pool.add<position>(i).x = static_cast<float>(i);
+		pool.add<velocity>(i).vx = static_cast<float>(i * 0.1);
 
-		// Creates: Add <Health> command with temp data -> results in: archetype <Health, Position> creation
-		health& health_data_0       = pool.add<health>(0);
-		health_data_0.points = 1;
-
-		// Creates: Add <ComponentTest> command with temp data -> results in: archetype <Health, Position, ComponentTest> creation
-		component_test& test_data_0 = pool.add<component_test>(0);
-
-		// Creates: Add <Position> command with temp data -> results in: archetype <Position> creation
-		position& position_data_1   = pool.add<position>(1);
-		position_data_1.x = 1;
-		position_data_1.y = 2;
-		position_data_1.z = 3;
-
-		// Creates: Add <ComponentTest> command with temp data -> results in: archetype <Position, ComponentTest> creation
-		component_test& test_data_1 = pool.add<component_test>(1);
-		test_data_1.test = 43;
-
-
-		// Creates: Add <Position> command with temp data -> results in: archetype <Position> creation
-		position& position_data_2   = pool.add<position>(2);
-
-		// Creates: Add <Health> command with temp data -> results in: archetype <Health, Position> creation
-		health& health_data = pool.add<health>(2);
-
-		// Gets data from "Add entity to <position>" command (Always Expensive Get)
-		position& position_data = *pool.get<position>(2);
-	}
-
-	// System tick done (Apply all commands)
-	pool.emplace_commands();
-
-	// All component archetypes are now created contiguously
-
-	// New system tick
-	{
-		// Add command: Remove <health> from entity 2 ->  results in: archetype <Position> migration
-		pool.remove<health>(2);
-
-		// Get position from <position, health> table (Still expensive but cheaper depending on context)
-		pool.emplace_commands();
-
-		auto query = pool.query<position, health>();
-
-		for (peetcs::query_value query_value : query)
+		if (i % 3 == 0)
 		{
-			position& position_data = query_value.get<position>();
-			std::cout << position_data.x << " " << position_data.y << " " << position_data.z << " " << std::endl;
+			pool.add<health>(i).points = i;
+		}
+
+		if (i % 5 == 0)
+		{
+			pool.add<attack>(i).damage = i * 10;
+		}
+
+		if (i % 7 == 0)
+		{
+			pool.add<defense>(i).armor = i * 5;
 		}
 	}
+	pool.emplace_commands();
+	auto end = std::chrono::high_resolution_clock::now();
+	std::cout << "Adding components took: "
+		<< std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+		<< " us\n";
+
+	// Measure time for querying multiple components
+	start = std::chrono::high_resolution_clock::now();
+	auto query_1 = pool.query<position, velocity, health>();
+	auto query_2 = pool.query<position, velocity, attack>();
+	auto query_3 = pool.query<position, velocity, defense>();
+	auto query_4 = pool.query<position, velocity, health, attack, defense>();
+	end = std::chrono::high_resolution_clock::now();
+	std::cout << "Querying multiple components took: "
+		<< std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+		<< " us\n";
+
+	// Measure time for querying a larger system with multiple components
+	start = std::chrono::high_resolution_clock::now();
+	for (auto q : query_4)
+	{
+		position& pos = q.get<position>();
+		velocity& vel = q.get<velocity>();
+		health& hp = q.get<health>();
+		attack& atk = q.get<attack>();
+		defense& def = q.get<defense>();
+
+		// Simulate some system work with the queried components
+		pos.x += vel.vx;
+		hp.points -= atk.damage;
+		def.armor += atk.damage / 2; // Simulate defense affecting armor
+	}
+	end = std::chrono::high_resolution_clock::now();
+	std::cout << "Querying larger system took: "
+		<< std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+		<< " us\n";
+
+	// Measure time for removing components
+	start = std::chrono::high_resolution_clock::now();
+	for (int i = 0; i < entity_count; i += 4)
+	{
+		pool.remove<health>(i);
+		pool.remove<attack>(i);
+	}
+	pool.emplace_commands();
+	end = std::chrono::high_resolution_clock::now();
+	std::cout << "Removing components took: "
+		<< std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+		<< " us\n";
+
+	return 0;
 }

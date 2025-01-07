@@ -44,6 +44,7 @@ set(SRC_INCLUDE
 	"include/archetype_block.hpp"
 	"include/archetype_id.hpp"
 	"include/archetype_pool.hpp"
+	"include/peetcs.hpp"
 	"include/peetcs_types.hpp"
 	"include/query_value.hpp"
 	"include/storage.hpp"

@@ -32,14 +32,15 @@ struct cool_data { float test; };
 #### Add Components:  
 ```cpp
 peetcs::archetype_pool pool;
+entity_id entity = 0;
 
-position& pos = pool.add<position>(0);  
+position& pos = pool.add<position>(entity);  
 pos.x = 1; pos.y = 2; pos.z = 3;
 
-health& hp = pool.add<health>(0);  
+health& hp = pool.add<health>(entity);  
 hp.points = 100;
 
-cool_data& cd = pool.add<cool_data>(0);  
+cool_data& cd = pool.add<cool_data>(entity);  
 cd.test = 43;
 
 pool.emplace_commands();  // Apply changes (invalidates previous references)
@@ -47,7 +48,7 @@ pool.emplace_commands();  // Apply changes (invalidates previous references)
 
 #### Remove Components:  
 ```cpp
-pool.remove<health>(0);  
+pool.remove<health>(entity);  
 pool.emplace_commands();
 ```
 

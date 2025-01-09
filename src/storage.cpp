@@ -6,12 +6,16 @@ namespace peetcs
 {
 	peetcs::storage::storage() = default;
 
-	storage::region storage::add_element()
+	storage::region storage::add_element(identifier_type identifier)
 	{
+		uint8_t* id_memory_start = &data[padding_index_end + element_index * (element_size + padding_element_id)];
+		std::memcpy(id_memory_start, &identifier, sizeof(identifier_type));
+
 		auto element_region = region {
 			.index = element_index,
-			.element_size = element_size,
-			.data = &data[padding_index_end + element_index * element_size],
+			.element_size = element_size + padding_element_id,
+			.identifier = identifier,
+			.data = &data[padding_index_end + element_index * (element_size + padding_element_id) + padding_element_id],
 			.storage_start = data.data()
 		};
 
@@ -26,15 +30,20 @@ namespace peetcs
 			return region {
 				.index= element_index,
 				.element_size= element_size,
+				.identifier = INT32_MIN,
 				.data= nullptr,
 				.storage_start= nullptr,
 			};
 		}
 
+		int identifier;
+		std::memcpy(&identifier, &data[padding_index_end + index * (element_size + padding_element_id)], sizeof(identifier_type));
+
 		return region{
 			.index = index,
 			.element_size = element_size,
-			.data = &data[padding_index_end + index * element_size],
+			.identifier = identifier,
+			.data = &data[padding_index_end + index * (element_size + padding_element_id) + padding_element_id],
 			.storage_start = data.data()
 		};
 	}
@@ -108,24 +117,14 @@ namespace peetcs
 	storage::iterator storage::begin()
 	{
 		return iterator {
-			*this, region {
-				.index= 0,
-				.element_size= element_size,
-				.data= &data[padding_index_end],
-				.storage_start = data.data(),
-			}
+			*this, get_element(0)
 		};
 	}
 
 	storage::iterator storage::end()
 	{
 		return  iterator {
-			*this, region {
-				.index= element_index,
-				.element_size= element_size,
-				.data= nullptr,
-				.storage_start= nullptr
-			}
+			*this, get_element(std::numeric_limits<std::size_t>::max())
 		};
 	}
 

@@ -12,10 +12,13 @@ namespace peetcs
 	{
 		storage block;
 		archetype_id archetype_info;
+		entity_id last_entity_in_storage;
 
 	public:
 
-		archetype_block() = default;
+		archetype_block()
+		{
+		}
 
 		explicit archetype_block(const archetype_id& id);
 
@@ -26,6 +29,7 @@ namespace peetcs
 		void remove_entity(const entity_id entity);
 
 		std::unordered_map<entity_id, std::size_t> entity_index_map;
+
 
 		class iterator
 		{

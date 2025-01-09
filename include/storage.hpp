@@ -10,7 +10,9 @@ namespace peetcs
 	{
 	public:
 		typedef std::uint8_t storage_type;
+		typedef int identifier_type;
 		static constexpr size_t padding_element_type = 6;
+		static constexpr size_t padding_element_id   = sizeof(identifier_type);
 		static constexpr size_t padding_nb_of_element = 1;
 
 	private:
@@ -25,6 +27,7 @@ namespace peetcs
 		{
 			size_t index;
 			std::size_t element_size;
+			identifier_type identifier;
 			void* data;
 			void* storage_start;
 		};
@@ -32,7 +35,7 @@ namespace peetcs
 		storage();
 		storage(const std::vector<peetcs::type_info>& type_description, std::size_t number_of_elements);
 
-		region add_element();
+		region add_element(identifier_type identifier);
 
 		region get_element(const std::size_t index);
 

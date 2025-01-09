@@ -32,6 +32,10 @@ int main()
 	constexpr int entity_count = 100000; // Number of entities for the test
 	peetcs::archetype_pool pool;
 
+	std::cout << "Adding components to " << entity_count << " entities";
+
+
+	int nb_of_components = 0;
 	// Measure time for adding components
 	auto start = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < entity_count; ++i)
@@ -39,24 +43,38 @@ int main()
 		pool.add<position>(i).x = static_cast<float>(i);
 		pool.add<velocity>(i).vx = static_cast<float>(i * 0.1);
 
+		nb_of_components += 2;
+
 		if (i % 3 == 0)
 		{
 			pool.add<health>(i).points = i;
+			nb_of_components++;
 		}
 
 		if (i % 5 == 0)
 		{
 			pool.add<attack>(i).damage = i * 10;
+			nb_of_components++;
 		}
 
 		if (i % 7 == 0)
 		{
 			pool.add<defense>(i).armor = i * 5;
+			nb_of_components++;
 		}
 	}
-	pool.emplace_commands();
 	auto end = std::chrono::high_resolution_clock::now();
-	std::cout << "Adding components took: "
+	std::cout << "took: "
+		<< std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+		<< " us\n";
+
+	std::cout << "Emplacing " << nb_of_components << " components to " << entity_count << " entities ";
+
+	start = std::chrono::high_resolution_clock::now();
+	pool.emplace_commands();
+	end = std::chrono::high_resolution_clock::now();
+
+	std::cout << "took: "
 		<< std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
 		<< " us\n";
 

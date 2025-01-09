@@ -12,13 +12,12 @@ namespace peetcs
 			free(add_command.component_data);
 		}
 
-		add_commands.clear();
-
 		for (const auto& remove_command : remove_commands)
 		{
 			execute_remove(remove_command);
 		}
 
+		add_commands.clear();
 		remove_commands.clear();
 	}
 

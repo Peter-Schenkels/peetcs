@@ -1,5 +1,7 @@
 #pragma once
 
+#include <map>
+
 #include "archetype_block.hpp"
 #include "archetype_id.hpp"
 #include "query_value.hpp"
@@ -20,15 +22,19 @@ namespace peetcs
 	{
 		entity_id target;
 		std::type_index component_type;
-		std::size_t archetype_hash;
 	};
 
 	struct archetype_pool
 	{
 		std::unordered_map<archetype_id, archetype_block, archetype_hash> blocks;
-		std::unordered_map<entity_id, archetype_id> entity_archetype_lookup;
-		std::vector<add_component_command> add_commands;
-		std::vector<remove_component_command> remove_commands;
+		std::unordered_map<entity_id, archetype_id>                       entity_archetype_lookup;
+		std::vector<add_component_command>                                add_commands;
+		std::vector<remove_component_command>                             remove_commands;
+
+		archetype_pool()
+		{
+		}
+
 
 		template<typename Component>
 		Component& add(const entity_id entity)
@@ -117,7 +123,6 @@ namespace peetcs
 			remove_component_command command = {
 				.target = entity,
 				.component_type = typeid(Component),
-				.archetype_hash = id.get_hash(),
 			};
 
 			remove_commands.push_back(command);

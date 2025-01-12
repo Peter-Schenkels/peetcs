@@ -14,10 +14,10 @@ template<typename Component>
 Component& get()
 {
     // Precompute values to avoid repeated calculation
-    auto* storage_ptr = static_cast<storage::storage_type*>(region.storage_start);
+    auto* storage_ptr = static_cast<uint8_t*>(region.storage_start);
     const std::size_t nb_of_types_in_element = *storage_ptr;
     const std::size_t component_hash = typeid(Component).hash_code();
-    const std::size_t base_offset = storage::padding_nb_of_element + nb_of_types_in_element * storage::padding_element_type;
+    const std::size_t base_offset = storage::padding_nb_of_element + nb_of_types_in_element * storage::padding_element_type + storage::padding_element_id;
 
     std::size_t element_offset = 0;
     const std::size_t hash_mask = 0xFFFFFFF8;  // Mask to compare hashes

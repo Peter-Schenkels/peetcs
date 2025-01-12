@@ -4,17 +4,25 @@
 
 namespace peetcs
 {
-	peetcs::storage::storage() = default;
+	peetcs::storage::storage()
+	{
+		data.resize(100000);
+	}
 
 	storage::region storage::add_element(identifier_type identifier)
 	{
-		uint8_t* id_memory_start = &data[padding_index_end + element_index * (element_size + padding_element_id)];
+		int* id_memory_start = reinterpret_cast<int*>(&data[padding_index_end + element_index * (element_size + padding_element_id)]);
 		std::memcpy(id_memory_start, &identifier, sizeof(identifier_type));
+
+		if ((*id_memory_start) != identifier)
+		{
+			__debugbreak();
+		}
 
 		auto element_region = region {
 			.index = element_index,
 			.element_size = element_size + padding_element_id,
-			.identifier = identifier,
+			.identifier = *id_memory_start,
 			.data = &data[padding_index_end + element_index * (element_size + padding_element_id) + padding_element_id],
 			.storage_start = data.data()
 		};
@@ -60,7 +68,7 @@ namespace peetcs
 
 	std::size_t storage::size() const
 	{
-		return data.size() / element_size;
+		return element_index;
 	}
 
 	std::size_t storage::last() const
@@ -140,7 +148,7 @@ namespace peetcs
 
 
 		uint8_t descriptor_padding_size = padding_nb_of_element;
-		descriptor_padding_size += nb_of_sub_types_in_element * padding_element_type; // 4 for type - 2 for element_size
+		descriptor_padding_size += nb_of_sub_types_in_element * padding_element_type; // 8 for type - 2 for element_size
 
 		element_size = 0;
 		for (const auto& description : type_description)
@@ -152,15 +160,15 @@ namespace peetcs
 		element_index = 0;
 
 		data.resize(descriptor_padding_size + number_of_elements * element_size);
-		data.emplace_back(nb_of_sub_types_in_element);
+
+		int data_index = 0;
+		data[data_index++] = nb_of_sub_types_in_element;
 
 		for (const auto& [type_id, type_size] : type_description)
 		{
 			const uint64_t type_hash = type_id.hash_code();
-			uint8_t type_id_layout_1 = static_cast<uint8_t>(type_hash >> 3);
-			uint8_t type_id_layout_2 = static_cast<uint8_t>(type_hash >> 2);
-			uint8_t type_id_layout_3 = static_cast<uint8_t>(type_hash >> 1);
-			uint8_t type_id_layout_4 = static_cast<uint8_t>(type_hash >> 0);
+			std::memcpy(&data[data_index], &type_hash, sizeof(uint64_t));
+			data_index += sizeof(uint64_t);
 
 			if (type_size >= std::numeric_limits<uint16_t>::max())
 			[[unlikely]]
@@ -169,13 +177,13 @@ namespace peetcs
 			}
 
 			const uint16_t sub_element_size = static_cast<uint16_t>(type_size);
-			uint8_t sub_element_size_1 = static_cast<uint8_t>(sub_element_size >> 1);
-			uint8_t sub_element_size_2 = static_cast<uint8_t>(sub_element_size >> 0);
+			std::memcpy(&data[data_index], &sub_element_size, sizeof(uint16_t));
+			data_index += sizeof(std::uint16_t);
+		}
 
-			data.insert(data.end(), {
-				            type_id_layout_1, type_id_layout_2, type_id_layout_3, type_id_layout_4, sub_element_size_1,
-				            sub_element_size_2
-			            });
+		if (data_index != padding_index_end)
+		{
+			__debugbreak();
 		}
 	}
 }

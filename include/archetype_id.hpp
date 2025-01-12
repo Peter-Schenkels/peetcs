@@ -83,7 +83,7 @@ namespace peetcs
 					const uint8_t retrieved_hash_3 = *(static_cast<storage::storage_type*>(target.storage_start) + offset + 2);
 					const uint8_t retrieved_hash_4 = *(static_cast<storage::storage_type*>(target.storage_start) + offset + 3);
 
-					const uint64_t retrieved_hash = retrieved_hash_1 >> 3 | retrieved_hash_2 >> 2 | retrieved_hash_3 >> 1 | retrieved_hash_4;
+					const uint64_t retrieved_hash = retrieved_hash_1 >> 3 * 8 | retrieved_hash_2 >> 2 * 8 | retrieved_hash_3 >> 1 * 8 | retrieved_hash_4;
 
 					if (retrieved_hash == component_hash) [[likely]]
 					{
@@ -95,7 +95,7 @@ namespace peetcs
 				uint8_t element_size_1 = *(static_cast<storage::storage_type*>(target.storage_start) + offset);
 				uint8_t element_size_2 = *(static_cast<storage::storage_type*>(target.storage_start) + offset + 1);
 
-				element_offset += element_size_1 >> 1 | element_size_2;
+				element_offset += element_size_1 >> 8 | element_size_2;
 			}
 
 			Component* component_ptr = reinterpret_cast<Component*>(static_cast<storage::storage_type*>(target.data) + element_offset);

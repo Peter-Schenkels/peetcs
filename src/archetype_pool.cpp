@@ -33,7 +33,6 @@ namespace peetcs
 
 			const auto block_it = blocks.find(memory_descriptor);
 
-
 			// Scenario 2 (Block doesnt exist and entity doesn't exist)
 			if (block_it == blocks.end())
 			{

@@ -31,8 +31,11 @@ namespace peetcs
 		std::vector<add_component_command>                                add_commands;
 		std::vector<remove_component_command>                             remove_commands;
 
+		archetype_block empty_block = {};
+
 		archetype_pool()
 		{
+			add_commands.reserve(100000);
 		}
 
 
@@ -49,7 +52,7 @@ namespace peetcs
 			*static_cast<Component*>(command.component_data) = Component{};
 
 			add_commands.push_back(command);
-			return *static_cast<Component*>(add_commands.back().component_data);
+			return *static_cast<Component*>(command.component_data);
 		}
 
 		template<typename Component>
@@ -120,6 +123,9 @@ namespace peetcs
 		{
 			auto& id = entity_archetype_lookup[entity];
 
+			if (!has<Component>(entity)) [[unlikely]]
+				return;
+
 			remove_component_command command = {
 				.target = entity,
 				.component_type = typeid(Component),
@@ -160,10 +166,15 @@ namespace peetcs
 				explicit iterator(component_query& query) :
 					archetype_it(query.archetype_traversal.begin()),
 					archetype_it_end(query.archetype_traversal.end()),
-					block_it(*query.pool.blocks[*archetype_it].begin()),
-					block_it_end(*query.pool.blocks[*archetype_it].end()),
+					block_it( archetype_it != archetype_it_end ? *query.pool.blocks[*archetype_it].begin() : *query.pool.empty_block.begin()),
+					block_it_end(archetype_it != archetype_it_end ? *query.pool.blocks[*archetype_it].end() : *query.pool.empty_block.end()),
 					target_query(query)
 				{
+					if (archetype_it == archetype_it_end)
+					{
+						return;
+					}
+
 					if (block_it == block_it_end)
 					{
 						++archetype_it;
@@ -245,7 +256,21 @@ namespace peetcs
 
 			iterator end()
 			{
-				return  iterator(*this, archetype_traversal.end(), archetype_traversal.end(), *pool.blocks[archetype_traversal.back()].end(), *pool.blocks[archetype_traversal.back()].end());
+				if (archetype_traversal.empty())
+				{
+					return iterator(*this,
+						archetype_traversal.end(),
+						archetype_traversal.end(),
+						*pool.empty_block.end(),
+						*pool.empty_block.end());
+				}
+				
+
+				return  iterator(*this, 
+					archetype_traversal.end(), 
+					archetype_traversal.end(), 
+					*pool.blocks[archetype_traversal.back()].end(), 
+					*pool.blocks[archetype_traversal.back()].end());
 			}
 		};
 

@@ -22,6 +22,7 @@ include(CMake/AddProjectMacro/Macros.cmake)
 
 # FILE GROUP SRC_PEETCS
 set(SRC_PEETCS
+	"cmakegen.exe"
 	"CMakeLists.txt"
 	"main.cpp"
 	"README.md"
@@ -64,8 +65,16 @@ set(SRC_SRC
 source_group("src" FILES ${SRC_SRC})
 
 
+# FILE GROUP SRC_TESTS
+set(SRC_TESTS
+	"tests/unit_tests.hpp"
+)
+
+source_group("tests" FILES ${SRC_TESTS})
+
+
 # LIBRARY GROUP PeetCS
-set(SRC_LIB_PEETCS ${SRC_PEETCS} ${SRC_CMAKEGEN} ${SRC_INCLUDE} ${SRC_SRC} )
+set(SRC_LIB_PEETCS ${SRC_PEETCS} ${SRC_CMAKEGEN} ${SRC_INCLUDE} ${SRC_SRC} ${SRC_TESTS} )
 
 
 # define the target
@@ -74,4 +83,4 @@ add_project(PEETCS
             SOURCES ${SRC_LIB_PEETCS}
             DEPENDS )
 
-SET_TARGET_PROPERTIES(PEETCS PROPERTIES LINK_FLAGS "/PROFILE")
+

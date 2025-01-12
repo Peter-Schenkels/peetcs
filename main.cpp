@@ -1,44 +1,20 @@
 #include <iostream>
 #include <chrono>
 #include "include/archetype_pool.hpp"
+#include "tests/unit_tests.hpp"
 
-struct position
-{
-	float x, y, z;
-};
-
-struct velocity
-{
-	float vx, vy, vz;
-};
-
-struct health
-{
-	int points;
-};
-
-struct attack
-{
-	int damage;
-};
-
-struct defense
-{
-	int armor;
-};
 
 int main()
 {
-	constexpr int entity_count = 100000; // Number of entities for the test
+	run_tests();
+
+
+	constexpr int entity_count = 1000; // Number of entities for the test
 	peetcs::archetype_pool pool;
-
-
 
 	for (int i = 0; i < 30; i++)
 	{
-
 		std::cout << "Adding components to " << entity_count << " entities";
-
 		int nb_of_components = 0;
 		// Measure time for adding components
 		auto start = std::chrono::high_resolution_clock::now();

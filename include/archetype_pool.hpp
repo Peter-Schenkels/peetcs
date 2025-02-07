@@ -1,19 +1,18 @@
 #pragma once
-
-#include <map>
-
-#include "archetype_block.hpp"
-#include "archetype_id.hpp"
+#include <ranges>
+#include <unordered_map>
+#include "generic_container.hpp"
 #include "query_value.hpp"
 
-#include <ranges>
 
 namespace peetcs
 {
+	using entity_id = element_layout::id_t;
+
 	struct add_component_command
 	{
 		entity_id target;
-		std::type_index component_type;
+		element_layout::hash_t component_type;
 		std::size_t component_size;
 		void* component_data;
 	};
@@ -21,30 +20,30 @@ namespace peetcs
 	struct remove_component_command
 	{
 		entity_id target;
-		std::type_index component_type;
+		element_layout::hash_t component_type;
 	};
 
 	struct archetype_pool
 	{
-		std::unordered_map<archetype_id, archetype_block, archetype_hash> blocks;
-		std::unordered_map<entity_id, archetype_id>                       entity_archetype_lookup;
-		std::vector<add_component_command>                                add_commands;
-		std::vector<remove_component_command>                             remove_commands;
+		std::unordered_map<element_layout, generic_container> blocks;
+		std::unordered_map<entity_id, element_layout>         entity_archetype_lookup;
+		std::vector<add_component_command>                    add_commands;
+		std::vector<remove_component_command>                 remove_commands;
 
-		archetype_block empty_block = {};
+		std::size_t default_array_size = 10000;
 
 		archetype_pool()
 		{
-			add_commands.reserve(100000);
+			add_commands.reserve(default_array_size * 10);
+			remove_commands.reserve(default_array_size * 10);
 		}
-
 
 		template<typename Component>
 		Component& add(const entity_id entity)
 		{
 			add_component_command command = {
 				.target= entity,
-				.component_type= typeid(Component),
+				.component_type= type_id<Component>::id(),
 				.component_size= sizeof(Component),
 				.component_data= malloc(sizeof(Component))
 			};
@@ -52,13 +51,13 @@ namespace peetcs
 			*static_cast<Component*>(command.component_data) = Component{};
 
 			add_commands.push_back(command);
-			return *static_cast<Component*>(command.component_data);
+			return *static_cast<Component*>(command.component_data);	
 		}
 
 		template<typename Component>
 		Component* get(const entity_id entity)
 		{
-			const auto& component_type = typeid(Component);
+			const auto& component_type = type_id<Component>::id();
 
 			// Scenario 1 (Component is in an archetype)
 			auto archetype_it = entity_archetype_lookup.find(entity);
@@ -66,12 +65,9 @@ namespace peetcs
 			{
 				if (archetype_it->second.contains(component_type))
 				{
-					archetype_id& memory_accesor = archetype_it->second;
-
-					auto& block = blocks[memory_accesor];
-					storage::region region = block.get_entity(entity);
-					void* component_data = memory_accesor.get_component_ptr(component_type, region);
-					return static_cast<Component*>(component_data);
+					auto& block = blocks[archetype_it->second];
+					generic_container::element_rep rep = block.get_element(entity);
+					return rep.get_ptr<Component>();
 				}
 			}
 
@@ -84,24 +80,23 @@ namespace peetcs
 				}
 			}
 
-
 			// Scenario 3 (Entity or component does not exist)
 			return nullptr;
 		}
 
 		void emplace_commands();
 
-		void execute_add(entity_id entity, void* data, std::type_index component_type, std::size_t component_size);
+		generic_container::element_rep execute_add(entity_id entity, void* data, element_layout::hash_t component_type, std::size_t component_size);
 		void execute_remove(const remove_component_command& command);
 
 		template<typename ... Components>
-		void get_archetypes_with(std::vector<archetype_id>& archetypes)
+		void get_archetypes_with(std::vector<element_layout>& archetypes)
 		{
-			for (auto& archetype_id : blocks | std::views::keys)
+			for (auto& element_layout : blocks | std::views::keys)
 			{
-				if ((archetype_id.contains(typeid(Components)) && ...))
+				if ((element_layout.contains(type_id<Components>::id()) && ...))
 				{
-					archetypes.push_back(archetype_id);
+					archetypes.push_back(element_layout);
 				}
 			}
 		}
@@ -112,7 +107,7 @@ namespace peetcs
 			auto archetype_it = entity_archetype_lookup.find(entity);
 			if (archetype_it != entity_archetype_lookup.end())
 			{
-				return archetype_it->second.contains(typeid(Component));
+				return archetype_it->second.contains(type_id<Component>::id());
 			}
 
 			return false;
@@ -123,12 +118,12 @@ namespace peetcs
 		{
 			auto& id = entity_archetype_lookup[entity];
 
-			if (!has<Component>(entity)) [[unlikely]]
+			if (!id.contains(type_id<Component>::id())) [[unlikely]]
 				return;
 
 			remove_component_command command = {
 				.target = entity,
-				.component_type = typeid(Component),
+				.component_type = type_id<Component>::id(),
 			};
 
 			remove_commands.push_back(command);
@@ -139,7 +134,7 @@ namespace peetcs
 		{
 			entity_id entity;
 			archetype_pool& pool;
-			std::vector<archetype_id> archetype_traversal;
+			std::vector<element_layout> archetype_traversal;
 
 			explicit component_query(archetype_pool& pool) : entity(-1),
 			                                                 pool(pool),
@@ -157,17 +152,17 @@ namespace peetcs
 				using pointer = query_value*;                                  // Pointer to the element type_id
 				using reference = query_value&;                                // Reference to the element type_id
 
-				std::vector<archetype_id>::iterator archetype_it;
-				std::vector<archetype_id>::iterator archetype_it_end;
-				storage::iterator block_it;
-				storage::iterator block_it_end;
+				std::vector<element_layout>::iterator archetype_it;
+				std::vector<element_layout>::iterator archetype_it_end;
+				generic_container::iterator block_it;
+				generic_container::iterator block_it_end;
 				component_query& target_query;
 
 				explicit iterator(component_query& query) :
 					archetype_it(query.archetype_traversal.begin()),
 					archetype_it_end(query.archetype_traversal.end()),
-					block_it( archetype_it != archetype_it_end ? *query.pool.blocks[*archetype_it].begin() : *query.pool.empty_block.begin()),
-					block_it_end(archetype_it != archetype_it_end ? *query.pool.blocks[*archetype_it].end() : *query.pool.empty_block.end()),
+					block_it( archetype_it != archetype_it_end ? query.pool.blocks[*archetype_it].begin() : query.pool.blocks[element_layout{}].begin()),
+					block_it_end(archetype_it != archetype_it_end ? query.pool.blocks[*archetype_it].end() : query.pool.blocks[element_layout{}].end()),
 					target_query(query)
 				{
 					if (archetype_it == archetype_it_end)
@@ -180,8 +175,8 @@ namespace peetcs
 						++archetype_it;
 						while (archetype_it != archetype_it_end)
 						{
-							block_it = *query.pool.blocks[*archetype_it].begin();
-							block_it_end = *query.pool.blocks[*archetype_it].end();
+							block_it = query.pool.blocks[*archetype_it].begin();
+							block_it_end = query.pool.blocks[*archetype_it].end();
 
 							if (block_it != block_it_end)
 							{
@@ -195,9 +190,9 @@ namespace peetcs
 				}
 
 				iterator(component_query& query,
-					const std::vector<archetype_id>::iterator& archetype_it,
-					const std::vector<archetype_id>::iterator& archetype_it_end, const storage::iterator& block_it,
-					const storage::iterator& block_it_end) :
+					const std::vector<element_layout>::iterator& archetype_it,
+					const std::vector<element_layout>::iterator& archetype_it_end, const generic_container::iterator& block_it,
+					const generic_container::iterator& block_it_end) :
 					archetype_it(archetype_it),
 					archetype_it_end(archetype_it_end),
 					block_it(block_it),
@@ -214,10 +209,10 @@ namespace peetcs
 						++archetype_it;
 						while (archetype_it != archetype_it_end) [[unlikely]]
 						{
-							archetype_block& block = target_query.pool.blocks[*archetype_it];
+							generic_container& block = target_query.pool.blocks[*archetype_it];
 
-							block_it = *block.begin();
-							block_it_end = *block.end();
+							block_it = block.begin();
+							block_it_end = block.end();
 
 							if (block_it != block_it_end) [[likely]]
 							{
@@ -261,16 +256,15 @@ namespace peetcs
 					return iterator(*this,
 						archetype_traversal.end(),
 						archetype_traversal.end(),
-						*pool.empty_block.end(),
-						*pool.empty_block.end());
+						pool.blocks[element_layout{}].end(),
+						pool.blocks[element_layout{}].end());
 				}
-				
 
-				return  iterator(*this, 
+				return iterator(*this, 
 					archetype_traversal.end(), 
 					archetype_traversal.end(), 
-					*pool.blocks[archetype_traversal.back()].end(), 
-					*pool.blocks[archetype_traversal.back()].end());
+					pool.blocks[archetype_traversal.back()].end(), 
+					pool.blocks[archetype_traversal.back()].end());
 			}
 		};
 

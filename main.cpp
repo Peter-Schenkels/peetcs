@@ -4,14 +4,9 @@
 #include "tests/unit_tests.hpp"
 
 
-int main()
+void run_performance_simulation_test(const int entity_count)
 {
-	run_tests();
-
-
-	constexpr int entity_count = 1000; // Number of entities for the test
 	peetcs::archetype_pool pool;
-
 	for (int i = 0; i < 30; i++)
 	{
 		std::cout << "Adding components to " << entity_count << " entities";
@@ -25,19 +20,19 @@ int main()
 
 			nb_of_components += 2;
 
-			if (i % 3 == 0)
+			//if (i % 3 == 0)
 			{
 				pool.add<health>(i).points = i;
 				nb_of_components++;
 			}
 
-			if (i % 5 == 0)
+			//if (i % 5 == 0)
 			{
 				pool.add<attack>(i).damage = i * 10;
 				nb_of_components++;
 			}
 
-			if (i % 7 == 0)
+			//if (i % 7 == 0)
 			{
 				pool.add<defense>(i).armor = i * 5;
 				nb_of_components++;
@@ -91,18 +86,27 @@ int main()
 
 		// Measure time for removing components
 		start = std::chrono::high_resolution_clock::now();
-		for (int i = 0; i < entity_count; i += 4)
+		for (int i = 0; i < entity_count; i ++)
 		{
 			pool.remove<health>(i);
 			pool.remove<attack>(i);
+			pool.remove<position>(i);
+			pool.remove<velocity>(i);
+			pool.remove<defense>(i);
 		}
 		pool.emplace_commands();
 		end = std::chrono::high_resolution_clock::now();
 		std::cout << "Removing components took: "
 			<< std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
 			<< " us\n";
-
 	}
+}
+
+int main()
+{
+	//run_tests();
+	constexpr int entity_count = 1000; // Number of entities for the test
+	run_performance_simulation_test(entity_count);
 
 	return 0;
 }

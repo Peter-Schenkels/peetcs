@@ -22,7 +22,6 @@ include(CMake/AddProjectMacro/Macros.cmake)
 
 # FILE GROUP SRC_PEETCS
 set(SRC_PEETCS
-	"cmakegen.exe"
 	"CMakeLists.txt"
 	"main.cpp"
 	"README.md"
@@ -41,13 +40,9 @@ source_group("CMakeGen" FILES ${SRC_CMAKEGEN})
 
 # FILE GROUP SRC_INCLUDE
 set(SRC_INCLUDE
-	"include/archetype_block.hpp"
-	"include/archetype_id.hpp"
 	"include/archetype_pool.hpp"
-	"include/peetcs.hpp"
-	"include/peetcs_types.hpp"
 	"include/query_value.hpp"
-	"include/storage.hpp"
+	"include/generic_container.hpp"
 )
 
 source_group("include" FILES ${SRC_INCLUDE})
@@ -55,11 +50,9 @@ source_group("include" FILES ${SRC_INCLUDE})
 
 # FILE GROUP SRC_SRC
 set(SRC_SRC
-	"src/archetype_block.cpp"
-	"src/archetype_id.cpp"
 	"src/archetype_pool.cpp"
 	"src/query_value.cpp"
-	"src/storage.cpp"
+	"src/generic_container.cpp"
 )
 
 source_group("src" FILES ${SRC_SRC})

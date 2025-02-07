@@ -16,20 +16,6 @@ include(CMake/AddProjectMacro/Macros.cmake)
 ##############################
 
 
-
-
-
-
-# FILE GROUP SRC_PEETCS
-set(SRC_PEETCS
-	"CMakeLists.txt"
-	"main.cpp"
-	"README.md"
-)
-
-source_group("PeetCS" FILES ${SRC_PEETCS})
-
-
 # FILE GROUP SRC_CMAKEGEN
 set(SRC_CMAKEGEN
 	"CMakeGen/CMakeLists.template"
@@ -40,6 +26,7 @@ source_group("CMakeGen" FILES ${SRC_CMAKEGEN})
 
 # FILE GROUP SRC_INCLUDE
 set(SRC_INCLUDE
+	"include/peetcs.hpp"
 	"include/archetype_pool.hpp"
 	"include/query_value.hpp"
 	"include/generic_container.hpp"
@@ -67,13 +54,29 @@ source_group("tests" FILES ${SRC_TESTS})
 
 
 # LIBRARY GROUP PeetCS
-set(SRC_LIB_PEETCS ${SRC_PEETCS} ${SRC_CMAKEGEN} ${SRC_INCLUDE} ${SRC_SRC} ${SRC_TESTS} )
+set(SRC_LIB_PEETCS ${SRC_CMAKEGEN} ${SRC_INCLUDE} ${SRC_SRC} ${SRC_TESTS} )
 
 
 # define the target
 add_project(PEETCS
-            COMMAND
+            STATIC_LIB
             SOURCES ${SRC_LIB_PEETCS}
             DEPENDS )
 
+
+
+# FILE GROUP SRC_PEETCS
+set(SRC_MAIN
+	"CMakeLists.txt"
+	"main.cpp"
+	"README.md"
+)
+
+source_group("Main" FILES ${SRC_MAIN})
+
+# define the target
+add_project(TESTER
+            COMMAND
+            SOURCES ${SRC_MAIN}
+            DEPENDS PEETCS)
 

@@ -22,7 +22,7 @@ struct element_layout
 	using hash_t           = HASH_VALUE_TYPE;
 	using stride_t         = uint16_t;
 	using id_t             = uint32_t;
-	using index_t          = uint32_t;
+	using index_t          = int32_t;
 	using element_stride_t = uint32_t;
 
 	struct element_info
@@ -187,6 +187,8 @@ struct generic_container
 	bool contains(const element_layout::id_t id);
 
 	void remove_at(const element_layout::index_t index);
+
+	void pop();
 
 	void remove(const element_layout::id_t id);
 

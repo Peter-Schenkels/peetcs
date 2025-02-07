@@ -311,6 +311,14 @@ void generic_container::remove_at(const element_layout::index_t index)
 	element_stack_index--;
 }
 
+void generic_container::pop()
+{
+	if (element_stack_index > 0) [[likely]]
+	{
+		element_stack_index--;
+	}
+}
+
 void generic_container::remove(const element_layout::id_t id)
 {
 	element_rep element = get_element(id);

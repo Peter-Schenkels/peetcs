@@ -104,7 +104,7 @@ void run_performance_simulation_test(const int entity_count)
 
 int main()
 {
-	//run_tests();
+	run_tests();
 	constexpr int entity_count = 1000; // Number of entities for the test
 	run_performance_simulation_test(entity_count);
 

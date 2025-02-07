@@ -7,20 +7,23 @@
 
 namespace peetcs
 {
-	using entity_id = element_layout::id_t;
+	using entity_id      = element_layout::id_t;
+	using component_id   = element_layout::index_t;
+	using component_type = element_layout::hash_t;
 
 	struct add_component_command
 	{
-		entity_id target;
-		element_layout::hash_t component_type;
-		std::size_t component_size;
-		void* component_data;
+		entity_id      target;
+		component_type component_type;
+		std::size_t    component_size;
+		void*          component_data;
 	};
 
 	struct remove_component_command
 	{
-		entity_id target;
-		element_layout::hash_t component_type;
+		entity_id      target;
+		component_type component_type;
+		component_id   list_index;
 	};
 
 	struct archetype_pool
@@ -29,6 +32,8 @@ namespace peetcs
 		std::unordered_map<entity_id, element_layout>         entity_archetype_lookup;
 		std::vector<add_component_command>                    add_commands;
 		std::vector<remove_component_command>                 remove_commands;
+		// used for storing component lists contigously
+		std::unordered_map<entity_id, std::unordered_map<component_type, generic_container>> list_blocks;
 
 		std::size_t default_array_size = 10000;
 
@@ -57,6 +62,12 @@ namespace peetcs
 		template<typename Component>
 		Component* get(const entity_id entity)
 		{
+			return get_at<Component>(entity, 0);
+		}
+
+		template<typename Component>
+		Component* get_at(const entity_id entity, const component_id index)
+		{
 			const auto& component_type = type_id<Component>::id();
 
 			// Scenario 1 (Component is in an archetype)
@@ -65,18 +76,46 @@ namespace peetcs
 			{
 				if (archetype_it->second.contains(component_type))
 				{
-					auto& block = blocks[archetype_it->second];
-					generic_container::element_rep rep = block.get_element(entity);
-					return rep.get_ptr<Component>();
+					// Find component list
+					if (index > 0)
+					{
+						auto entity_containers_it = list_blocks.find(entity);
+						if ( entity_containers_it != list_blocks.end())
+						{
+							auto component_list_it = entity_containers_it->second.find(type_id<Component>::id());
+							if (component_list_it != entity_containers_it->second.end())
+							{
+								component_id index_in_list = index - 1;
+								if (component_list_it->second.size() > index_in_list)
+								{
+									return component_list_it->second.get_element_at(index_in_list).template get_ptr<Component>();
+								}
+							}
+						}
+					}
+					// Component is stored inside the archetype container
+					else [[likely]]
+					{
+						auto& block = blocks[archetype_it->second];
+						generic_container::element_rep rep = block.get_element(entity);
+						return rep.get_ptr<Component>();
+					}
 				}
 			}
 
 			// Scenario 2 (Component is not in an archetype)
+			component_id current_type_index = 0;
 			for (const auto& add_command : add_commands)
 			{
 				if (add_command.target == entity && add_command.component_type == component_type)
 				{
-					return static_cast<Component*>(add_command.component_data);
+					if (index == current_type_index)
+					{
+						return static_cast<Component*>(add_command.component_data);
+					}
+
+					// Try to match in cases when we add a component list while emplacing
+					current_type_index++;
 				}
 			}
 
@@ -86,7 +125,7 @@ namespace peetcs
 
 		void emplace_commands();
 
-		generic_container::element_rep execute_add(entity_id entity, void* data, element_layout::hash_t component_type, std::size_t component_size);
+		generic_container::element_rep execute_add(entity_id entity, void* data, component_type component_type, std::size_t component_size);
 		void execute_remove(const remove_component_command& command);
 
 		template<typename ... Components>
@@ -116,6 +155,12 @@ namespace peetcs
 		template<typename Component>
 		void remove(entity_id entity)
 		{
+			remove_at<Component>(entity, 0);
+		}
+
+		template<typename Component>
+		void remove_at(entity_id entity, component_id index)
+		{
 			auto& id = entity_archetype_lookup[entity];
 
 			if (!id.contains(type_id<Component>::id())) [[unlikely]]
@@ -124,6 +169,7 @@ namespace peetcs
 			remove_component_command command = {
 				.target = entity,
 				.component_type = type_id<Component>::id(),
+				.list_index = index
 			};
 
 			remove_commands.push_back(command);

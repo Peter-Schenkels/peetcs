@@ -15,14 +15,12 @@ include(CMake/AddProjectMacro/Macros.cmake)
 # Add all sources and headers #
 ##############################
 
-
 # FILE GROUP SRC_CMAKEGEN
 set(SRC_CMAKEGEN
 	"CMakeGen/CMakeLists.template"
 )
 
 source_group("CMakeGen" FILES ${SRC_CMAKEGEN})
-
 
 # FILE GROUP SRC_INCLUDE
 set(SRC_INCLUDE
@@ -63,6 +61,19 @@ add_project(PEETCS
             SOURCES ${SRC_LIB_PEETCS}
             DEPENDS )
 
+# FILE GROUP SRC_TESTS
+set(SRC_SHARED
+	"tests/shared.hpp"
+	"src/shared.cpp"
+)
+
+source_group("Shared" FILES ${SRC_SHARED})
+
+# define the target
+add_project(SHARED
+            SHARED_LIB
+            SOURCES ${SRC_SHARED}
+            DEPENDS )
 
 
 # FILE GROUP SRC_PEETCS

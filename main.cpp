@@ -2,6 +2,7 @@
 #include <chrono>
 #include "include/archetype_pool.hpp"
 #include "tests/unit_tests.hpp"
+#include "tests/shared.hpp"
 
 
 void run_performance_simulation_test(const int entity_count)
@@ -104,9 +105,11 @@ void run_performance_simulation_test(const int entity_count)
 
 int main()
 {
+	load_shared_lib();
 	run_tests();
 	constexpr int entity_count = 1000; // Number of entities for the test
 	run_performance_simulation_test(entity_count);
 
+	hello();
 	return 0;
 }

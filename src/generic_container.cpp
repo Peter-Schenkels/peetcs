@@ -51,7 +51,7 @@ void element_layout::remove(const hash_t type_index)
 	}
 
 	element_size -= found_element.stride + sizeof(sub_element_info);
-	meta_size += sizeof(type_info);
+	meta_size -= sizeof(type_info);
 
 	cached_hash = hash();
 }

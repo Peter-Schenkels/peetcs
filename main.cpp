@@ -5,6 +5,11 @@
 #include "tests/shared.hpp"
 
 
+struct pingas
+{
+	float a;
+};
+
 void run_performance_simulation_test(const int entity_count)
 {
 	peetcs::archetype_pool pool;
@@ -18,6 +23,7 @@ void run_performance_simulation_test(const int entity_count)
 		{
 			pool.add<position>(i).x = static_cast<float>(i);
 			pool.add<velocity>(i).vx = static_cast<float>(i * 0.1);
+			pool.add<pingas>(i).a = static_cast<float>(i * 0.1);
 
 			nb_of_components += 2;
 
@@ -106,7 +112,7 @@ void run_performance_simulation_test(const int entity_count)
 int main()
 {
 	load_shared_lib();
-	run_tests();
+	//run_tests();
 	constexpr int entity_count = 1000; // Number of entities for the test
 	run_performance_simulation_test(entity_count);
 

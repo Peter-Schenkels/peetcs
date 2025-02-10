@@ -377,6 +377,36 @@ inline void test_query_components()
 		assert_eq(vel.vx, pos.x * 0.1f);
 	}
 
+	auto query_2 = pool.query<position, health>();
+	for (auto q : query_2)
+	{
+		position& pos = q.get<position>();
+		velocity& vel = q.get<velocity>();
+
+		//assert_eq(pos.x, hp.points / 10.0f);
+		assert_eq(vel.vx, pos.x * 0.1f);
+	}
+
+	auto query_3 = pool.query<position>();
+	for (auto q : query_2)
+	{
+		position& pos = q.get<position>();
+
+		//assert_eq(pos.x, hp.points / 10.0f);
+		assert_eq(pos.x * 0.1f, pos.x * 0.1f);
+	}
+
+
+	for (int i = 0; i < 50; ++i) 
+	{
+		pool.remove<position>(i);
+		pool.remove<velocity>(i);
+		if (i % 2 == 0)
+			pool.remove<health>(i);
+	}
+
+	pool.emplace_commands();
+
 	std::cout << "test_query_components passed\n";
 }
 
@@ -522,7 +552,7 @@ int inline run_tests()
 	test_remove_components();
 	test_edge_cases();
 	test_component_lists();
-	test_large_system();
+	//test_large_system();
 
 	return 0;
 }

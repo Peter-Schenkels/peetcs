@@ -13,7 +13,7 @@ struct pingas
 void run_performance_simulation_test(const int entity_count)
 {
 	peetcs::archetype_pool pool;
-	for (int i = 0; i < 30; i++)
+	for (int i = 0; i < 60; i++)
 	{
 		std::cout << "Adding components to " << entity_count << " entities";
 		int nb_of_components = 0;
@@ -62,9 +62,38 @@ void run_performance_simulation_test(const int entity_count)
 
 		// Measure time for querying multiple components
 		start = std::chrono::high_resolution_clock::now();
+		// Measure time for querying multiple components
+		start = std::chrono::high_resolution_clock::now();
 		auto query_1 = pool.query<position, velocity, health>();
+		for (auto q : query_1)
+		{
+			position& pos = q.get<position>();
+			velocity& vel = q.get<velocity>();
+			health& hp = q.get<health>();
+
+			// Simulate some system work with the queried components
+			pos.x += vel.vx;
+		}
 		auto query_2 = pool.query<position, velocity, attack>();
+		for (auto q : query_2)
+		{
+			position& pos = q.get<position>();
+			velocity& vel = q.get<velocity>();
+			attack& atk = q.get<attack>();
+
+			// Simulate some system work with the queried components
+			pos.x += vel.vx * atk.damage;
+		}
 		auto query_3 = pool.query<position, velocity, defense>();
+		for (auto q : query_3)
+		{
+			position& pos = q.get<position>();
+			velocity& vel = q.get<velocity>();
+			defense& def = q.get<defense>();
+
+			// Simulate some system work with the queried components
+			vel.vx -= def.armor * pos.x;
+		}
 		auto query_4 = pool.query<position, velocity, health, attack, defense>();
 		end = std::chrono::high_resolution_clock::now();
 		std::cout << "Querying multiple components took: "
@@ -102,6 +131,7 @@ void run_performance_simulation_test(const int entity_count)
 			pool.remove<defense>(i);
 		}
 		pool.emplace_commands();
+
 		end = std::chrono::high_resolution_clock::now();
 		std::cout << "Removing components took: "
 			<< std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()

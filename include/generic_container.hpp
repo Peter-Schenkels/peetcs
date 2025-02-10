@@ -216,8 +216,6 @@ struct generic_container
 
 		iterator& operator++();
 
-		iterator& operator=(const iterator& other);
-
 		element_rep operator*() const;
 
 		element_rep operator->() const;

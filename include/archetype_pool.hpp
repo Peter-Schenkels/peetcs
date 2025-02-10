@@ -221,8 +221,8 @@ namespace peetcs
 						++archetype_it;
 						while (archetype_it != archetype_it_end)
 						{
-							block_it = query.pool.blocks[*archetype_it].begin();
-							block_it_end = query.pool.blocks[*archetype_it].end();
+							new (&block_it) generic_container::iterator(query.pool.blocks[*archetype_it].begin());
+							new (&block_it_end) generic_container::iterator(query.pool.blocks[*archetype_it].end());
 
 							if (block_it != block_it_end)
 							{
@@ -257,8 +257,8 @@ namespace peetcs
 						{
 							generic_container& block = target_query.pool.blocks[*archetype_it];
 
-							block_it = block.begin();
-							block_it_end = block.end();
+							new (&block_it) generic_container::iterator(block.begin());
+							new (&block_it_end) generic_container::iterator(block.end());
 
 							if (block_it != block_it_end) [[likely]]
 							{

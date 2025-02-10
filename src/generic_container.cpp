@@ -177,6 +177,7 @@ void generic_container::element_rep::copy_sub_elements(const element_rep& old_re
 #ifndef DEPRECATED
 generic_container::generic_container(const std::vector<element_layout::type_info>& types, element_layout::index_t nb_of_elements)
 {
+	element_stack_index = 0;
 	layout = {};
 
 	for (auto type : types)
@@ -347,14 +348,6 @@ generic_container::iterator::iterator(generic_container& container, element_layo
 generic_container::iterator& generic_container::iterator::operator++()
 {
 	current_element++;
-	return *this;
-}
-
-generic_container::iterator& generic_container::iterator::operator=(const iterator& other)
-{
-	current_element = other.current_element;
-	new (&it_container) generic_container(other.it_container);
-
 	return *this;
 }
 

@@ -90,8 +90,8 @@ void pipo::render_texture_to_window(const glfw_window_data& window, const render
 glm::mat4 get_view(const pipo::transform_data& transform)
 {
     // Construct camera world matrix (T * R * S)
-    glm::mat4 translation = glm::translate(glm::mat4(1.0f), transform.position);
-    glm::mat4 rotation_mat = glm::toMat4(transform.rotation);
+    glm::mat4 translation = glm::translate(glm::mat4(1.0f), transform.get_pos());
+    glm::mat4 rotation_mat = glm::toMat4(transform.get_rotation());
 
     glm::mat4 world_matrix = translation * rotation_mat;
 
@@ -120,9 +120,9 @@ glm::mat4 get_projection(const pipo::camera_data& camera_data)
 
 glm::mat4 get_model(const pipo::transform_data& transform)
 {
-    glm::mat4 translation = glm::translate(glm::mat4(1.0f), transform.position);
-    glm::mat4 rotation_mat = glm::toMat4(transform.rotation);
-    glm::mat4 scale_mat = glm::scale(glm::mat4(1.0f), transform.scale);
+    glm::mat4 translation = glm::translate(glm::mat4(1.0f), transform.get_pos());
+    glm::mat4 rotation_mat = glm::toMat4(transform.get_rotation());
+    glm::mat4 scale_mat = glm::scale(glm::mat4(1.0f), transform.get_scale());
 
     glm::mat4 model_matrix = translation * rotation_mat * scale_mat;
 
@@ -134,12 +134,6 @@ bool pipo::start_frame()
     glfwSwapBuffers((GLFWwindow*)pipo::resources::window);
     glfwPollEvents();
 
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW);
 
     if (!glfwWindowShouldClose((GLFWwindow*)pipo::resources::window))
     {

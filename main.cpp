@@ -221,27 +221,40 @@ void main()
 	mesh_settings.nb_of_indices = 3;
 	mesh_settings.nb_of_vertices = 3;
 
-	peetcs::entity_id triangle = 0;
-	peetcs::entity_id camera = 1;
+	peetcs::entity_id triangle = 1;
+	peetcs::entity_id camera = 0;
+
+	pipo::shader_id shader = pipo::resources::create_shader_gpu(shader_settings);
 
 	{
-		pipo::mesh_render_data& mesh_render = pool.add<pipo::mesh_render_data>(triangle);
-		mesh_render.mesh_id = pipo::resources::allocate_mesh_gpu(mesh_settings);
+		for (int i = 0; i < 100; i++)
+		{
+			triangle = i + 1;
 
-		pipo::material_data& material = pool.add<pipo::material_data>(triangle);
-		material.program = pipo::resources::create_shader_gpu(shader_settings);
+			int x = i % 10;
+			int y = i / 10;
 
-		pipo::transform_data& triangle_transform = pool.add<pipo::transform_data>(triangle);
-		triangle_transform.position = { 0, 0, 0 };
-		triangle_transform.rotation = glm::quat(glm::vec3(0, 0, 0));
-		triangle_transform.scale = { 1, 1, 1 };
+			pipo::mesh_render_data& mesh_render = pool.add<pipo::mesh_render_data>(triangle);
+			mesh_render.mesh_id = pipo::resources::allocate_mesh_gpu(mesh_settings);
+
+			pipo::material_data& material = pool.add<pipo::material_data>(triangle);
+			material.program = shader;
+
+			pipo::transform_data& triangle_transform = pool.add<pipo::transform_data>(triangle);
+			triangle_transform.set_pos(x, y, 0 );
+			triangle_transform.set_rotation(x,y, 0);
+			triangle_transform.set_scale(1, 1, 1);
+
+			pool.emplace_commands();
+		}
+
 
 
 		pipo::camera_data& camera_data = pool.add<pipo::camera_data>(camera);
 		pipo::transform_data& camera_transform = pool.add<pipo::transform_data>(camera);
 
-		camera_transform.position = { 0, 0, 2 };
-		camera_transform.rotation = glm::quat(glm::vec3(0, 0, 0));
+		camera_transform.set_pos(0, 0, 2);
+		camera_transform.set_rotation(0, 0, 0);
 
 		camera_data.c_near = 0.1f;
 		camera_data.c_far = 100.0f;
@@ -261,12 +274,11 @@ void main()
 		for (auto camera_value : camera_query)
 		{
 			pipo::transform_data& camera_transform = camera_value.get<pipo::transform_data>();
-			camera_transform.position.x += 0.001f;
-			camera_transform.position.y += 0.001f;
-			camera_transform.position.z += 0.005f;
-			camera_transform.rotation.z -= 0.001f;
+			camera_transform.position[0] += 0.001f;
+			camera_transform.position[1] += 0.001f;
+			camera_transform.position[2] += 0.010f;
+			camera_transform.rotation[2] -= 0.001f;
 		}
-
 	}
 
 	pipo::deinit();

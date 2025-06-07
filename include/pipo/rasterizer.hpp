@@ -55,11 +55,24 @@ public:
 		bool active;
 	};
 
+
+
+
+
+
 	struct transform_data
 	{
-		glm::vec3 position;
-		glm::vec3 scale;
-		glm::qua<float> rotation;
+		float position[3] = {0, 0, 0};
+		float scale[3] = { 0, 0, 0 };
+		float rotation[3] = { 0, 0, 0 };
+
+		glm::vec3 get_pos() const;
+		glm::vec3 get_scale() const;
+		glm::quat get_rotation() const;
+
+		void set_pos(float x, float y, float z);
+		void set_scale(float x, float y, float z);
+		void set_rotation(float pitch, float yaw, float roll);
 	};
 
 	struct mesh_render_data
@@ -214,6 +227,42 @@ private:
 	static void render_misc_material_meshes(peetcs::archetype_pool& pool);
 
 };
+
+inline void pipo::transform_data::set_rotation(float pitch, float yaw, float roll)
+{
+	rotation[0] = pitch;
+	rotation[1] = yaw;
+	rotation[2] = roll;
+}
+
+inline void pipo::transform_data::set_scale(float x, float y, float z)
+{
+	scale[0] = x;
+	scale[1] = y;
+	scale[2] = z;
+}
+
+inline void pipo::transform_data::set_pos(float x, float y, float z)
+{
+	position[0] = x;
+	position[1] = y;
+	position[2] = z;
+}
+
+inline glm::quat pipo::transform_data::get_rotation() const
+{
+	return glm::quat(glm::vec3(rotation[0], rotation[1], rotation[2]));
+}
+
+inline glm::vec3 pipo::transform_data::get_scale() const
+{
+	return glm::vec3(scale[0], scale[1], scale[2]);
+}
+
+inline glm::vec3 pipo::transform_data::get_pos() const
+{
+	return glm::vec3(position[0], position[1], position[2]);
+}
 
 template <>
 struct std::hash<pipo::mesh_id>

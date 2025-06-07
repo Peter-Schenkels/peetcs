@@ -1,12 +1,14 @@
 #include "include/generic_container.hpp"
 
+#include <ranges>
 #include <algorithm>
 #include <iostream>
+
 bool element_layout::element_info::operator==(const element_info& element_info) const = default;
 
 void element_layout::add(const hash_t& id, const stride_t& stride)
 {
-	for (auto type_info : layout)
+	for (const auto type_info : layout)
 	{
 		if (type_info.id == id)
 		{
@@ -23,15 +25,7 @@ void element_layout::add(const hash_t& id, const stride_t& stride)
 
 bool element_layout::contains(const hash_t& type) const
 {
-	for (auto type_info : layout)
-	{
-		if (type_info.id == type)
-		{
-			return true;
-		}
-	}
-
-	return false;
+	return std::ranges::any_of(layout, [type](const auto type_info) { return type_info.id == type; });
 }
 
 void element_layout::remove(const hash_t type_index)
@@ -82,14 +76,11 @@ void* element_layout::get_sub_element(hash_t type, void* element_ptr)
 		halt();
 	}
 
-	const element_info* info = reinterpret_cast<element_info*>(element_ptr);
-
+	const element_info* info = static_cast<element_info*>(element_ptr);
 	uint8_t* sub_element_ptr = static_cast<uint8_t*>(element_ptr) + sizeof(element_info);
 
-	int i = sub_element_ptr - element_ptr;
-
 	std::size_t offset = 0;
-	std::size_t max_offset = info->stride - sizeof(sub_element_info);
+	const std::size_t max_offset = info->stride - sizeof(sub_element_info);
 
 	while (offset < max_offset) [[likely]]
 	{
@@ -115,7 +106,7 @@ generic_container::element_rep::element_rep(void* element_ptr, generic_container
 void generic_container::element_rep::verify_ptr()
 {
 	// Check if our pointer is still valid
-	if (*static_cast<element_layout::element_info*>(element_ptr) != value_at_pointer) [[unlikely]]
+	[[unlikely]] if (*static_cast<element_layout::element_info*>(element_ptr) != value_at_pointer) 
 	{
 		element_rep rep  = parent_container.get_element_at(value_at_pointer.index);
 		value_at_pointer = rep.value_at_pointer;
@@ -136,7 +127,7 @@ element_layout::index_t generic_container::element_rep::get_index() const
 void generic_container::element_rep::set_generic_ptr(const element_layout::hash_t type, const std::size_t stride,
 	const void* new_data)
 {
-	if (new_data == nullptr)
+	if (new_data == nullptr) [[unlikely]]
 	{
 		return;
 	}
@@ -160,7 +151,7 @@ void generic_container::element_rep::copy_sub_elements(const element_rep& old_re
 	std::size_t offset = 0;
 	std::size_t max_offset = info->stride - sizeof(element_layout::sub_element_info);
 
-	while (offset < max_offset) [[likely]]
+	[[likely]] while (offset < max_offset) 
 	{
 		const auto sub_element = reinterpret_cast<const element_layout::sub_element_info*>(sub_element_ptr + offset);
 		void* old_sub_element_ptr = element_layout::get_sub_element(element_layout::hash_t{sub_element->id}, old_region.element_ptr);
@@ -194,10 +185,11 @@ generic_container::generic_container(element_layout in_layout, element_layout::i
 	layout(std::move(in_layout)),
 	layout_hash(layout.hash()),
 	max(nb_of_elements),
-	element_stack_index(0)
+	element_stack_index(0),
+	initial_nb_of_elements(nb_of_elements)
 {
 	data.resize(get_byte_index(nb_of_elements));
-	std::memcpy(data.data(), layout.layout.data(), layout.meta_size);
+	memcpy(data.data(), layout.layout.data(), layout.meta_size);
 }
 
 std::size_t generic_container::get_byte_index(const element_layout::index_t element_index) const
@@ -207,7 +199,7 @@ std::size_t generic_container::get_byte_index(const element_layout::index_t elem
 
 generic_container::element_rep generic_container::add_element(const element_layout::id_t id)
 {
-	if (element_stack_index >= (max - 1)) [[unlikely]]
+	[[unlikely]] if (element_stack_index >= (max - 1)) 
 	{
 		resize(max * 2);
 	}
@@ -267,9 +259,6 @@ generic_container::element_rep generic_container::get_element_at(const element_l
 
 generic_container::element_rep generic_container::get_element(const element_layout::id_t id)
 {
-	auto test = begin();
-	auto test_e = end();
-
 	int i = 0;
 
 	for (element_rep element : *this)
@@ -296,20 +285,22 @@ void generic_container::remove_at(const element_layout::index_t index)
 		halt();
 	}
 
-	if (element_stack_index - 1 == index)
+	if (element_stack_index - 1 != index)
 	{
-		element_stack_index--;
-		return;
+		void* remove_ptr = data.data() + get_byte_index(index);
+		void* last_ptr = data.data() + get_byte_index(element_stack_index - 1);
+
+		std::memcpy(remove_ptr, last_ptr, layout.element_size);
+		element_layout::element_info* info = static_cast<element_layout::element_info*>(remove_ptr);
+		info->index = index;
 	}
 
-
-	void* remove_ptr = data.data() + get_byte_index(index);
-	void* last_ptr   = data.data() + get_byte_index(element_stack_index - 1);
-
-	std::memcpy(remove_ptr, last_ptr, layout.element_size);
-	element_layout::element_info* info = static_cast<element_layout::element_info*>(remove_ptr);
-	info->index = index;
 	element_stack_index--;
+
+	if (max / 2 > element_stack_index + initial_nb_of_elements) [[unlikely]]
+	{
+		resize(element_stack_index + 1);
+	}
 }
 
 void generic_container::pop()
@@ -331,7 +322,7 @@ void generic_container::remove(const element_layout::id_t id)
 	remove_at(element.get_index());
 }
 
-void generic_container::resize(std::size_t new_size)
+void generic_container::resize(element_layout::index_t new_size)
 {
 	max = new_size;
 	data.resize(get_byte_index(new_size));

@@ -4,11 +4,14 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 message("Headers: ${CMAKE_CURRENT_SOURCE_DIR}")
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 
-
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -std=c++20" )
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+set (CMAKE_BUILD_TYPE "Release" CACHE
+      STRING "Choose the type of build.")
 
 include(CMake/AddProjectMacro/Macros.cmake)
 ###############################
@@ -30,7 +33,20 @@ set(SRC_INCLUDE
 	"include/generic_container.hpp"
 )
 
+# FILE GROUP SRC_INCLUDE_PIPO_RASTERIZER
+set(SRC_INCLUDE_PIPO_RASTERIZER
+	"include/pipo/rasterizer.hpp"
+)
+
+# FILE GROUP SRC_SRC
+set(SRC_SRC_PIPO
+	"src/pipo/rasterizer.cpp"
+)
+
+
 source_group("include" FILES ${SRC_INCLUDE})
+
+project(Peetcs)
 
 
 # FILE GROUP SRC_SRC
@@ -61,6 +77,8 @@ add_project(PEETCS
             SOURCES ${SRC_LIB_PEETCS}
             DEPENDS )
 
+
+
 # FILE GROUP SRC_TESTS
 set(SRC_SHARED
 	"tests/shared.hpp"
@@ -83,11 +101,53 @@ set(SRC_MAIN
 	"README.md"
 )
 
+# GLFW include and lib paths
+set(GLFW_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/external/glfw/include)
+include_directories(${GLFW_INCLUDE_DIR})
+
+# Determine correct GLFW lib folder
+if (MSVC)
+    # Detect toolset version (e.g. 1920+ is VS2019, 1930+ is VS2022)
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "19.30")
+        set(GLFW_LIB_DIR ${CMAKE_SOURCE_DIR}/external/glfw/lib-vc2022)
+    elseif (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "19.20")
+        set(GLFW_LIB_DIR ${CMAKE_SOURCE_DIR}/external/glfw/lib-vc2019)
+    else()
+        message(FATAL_ERROR "Unsupported MSVC version: ${CMAKE_CXX_COMPILER_VERSION}")
+    endif()
+    set(GLFW_LIB glfw3.lib)
+else()
+    # Assume MinGW if not MSVC
+    set(GLFW_LIB_DIR ${CMAKE_SOURCE_DIR}/external/glfw/lib-mingw)
+    set(GLFW_LIB libglfw3.a)
+endif()
+
+link_directories(${GLFW_LIB_DIR})
+
+# Add path to GLEW include files
+include_directories(${CMAKE_SOURCE_DIR}/external/glew/include)
+include_directories(external/glm external/stb external/obj_loader)
+
+# Add path to GLEW libraries
+link_directories(${CMAKE_SOURCE_DIR}/external/glew/lib/Release/x64)
+
+set(SRC_LIB_PIPO_RASTERIZER ${SRC_INCLUDE} ${SRC_INCLUDE_PIPO_RASTERIZER} ${SRC_SRC_PIPO} ${SRC_SRC} ${SRC_TESTS})
+
+# define the target
+add_project(PIPO
+            STATIC_LIB 
+            SOURCES ${SRC_LIB_PIPO_RASTERIZER}
+            DEPENDS PEETCS ${GLFW_LIB} glew32s opengl32)
+
+			
+target_include_directories(PIPO PRIVATE external/glm external/stb external/obj_loader)
+
+
 source_group("Main" FILES ${SRC_MAIN})
+
 
 # define the target
 add_project(TESTER
-            COMMAND
+            COMMAND 
             SOURCES ${SRC_MAIN}
-            DEPENDS PEETCS)
-
+            DEPENDS PEETCS PIPO)

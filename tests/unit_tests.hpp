@@ -29,17 +29,17 @@ struct defense
 };
 
 
-template <typename T, typename... Args>
-class can_to_string
-{
-	template <typename C, typename = decltype(std::to_string(std::declval<Args>()...))>
-	static std::true_type test(int);
-	template <typename C>
-	static std::false_type test(...);
+// template <typename T, typename... Args>
+// class can_to_string
+// {
+// 	template <typename C, typename = decltype(std::to_string(std::declval<Args>()...))>
+// 	static std::true_type test(int);
+// 	template <typename C>
+// 	static std::false_type test(...);
 
-public:
-	static constexpr bool value = decltype(test<T>(0))::value;
-};
+// public:
+// 	static constexpr bool value = decltype(test<T>(0))::value;
+// };
 
 template<typename A, typename B>
 void assert_eq(A a, B b)
@@ -62,19 +62,19 @@ void assert_eq(A a, B b)
 	if (failed)
 	{
 		std::string a_name = "A";
-		if constexpr (can_to_string<A>::value)
-		{
-			a_name = std::to_string(a);
-		}
+		// if constexpr (can_to_string<A>::value)
+		// {
+		// 	a_name = std::to_string(a);
+		// }
 
 		std::string b_name = "B";
-		if constexpr  (can_to_string<B>::value)
-		{
-			b_name = std::to_string(b);
-		}
+		// if constexpr  (can_to_string<B>::value)
+		// {
+		// 	b_name = std::to_string(b);
+		// }
 
 		std::cout << a_name << " != " << b_name << std::endl;
-		__debugbreak();
+		halt();
 	}
 }
 
@@ -99,19 +99,19 @@ void assert_neq(A a, B b)
 	if (failed)
 	{
 		std::string a_name = "A";
-		if constexpr (can_to_string<A>::value)
-		{
-			a_name = std::to_string(a);
-		}
+		// if constexpr (can_to_string<A>::value)
+		// {
+		// 	a_name = std::to_string(a);
+		// }
 
 		std::string b_name = "B";
-		if constexpr  (can_to_string<B>::value)
-		{
-			b_name = std::to_string(b);
-		}
+		// if constexpr  (can_to_string<B>::value)
+		// {
+		// 	b_name = std::to_string(b);
+		// }
 
 		std::cout << a_name << " == " << b_name << std::endl;
-		__debugbreak();
+		halt();
 	}
 }
 
@@ -329,8 +329,8 @@ inline void test_add_components()
 	std::cout << "test_add_components passed\n";
 
 	for (int i = 0; i < 100; ++i) {
-		position* pos = pool.get<position>(i);
-		velocity* vel = pool.get<velocity>(i);
+		position* pos = pool.get_from_owner<position>(i);
+		velocity* vel = pool.get_from_owner<velocity>(i);
 
 		assert_eq(pos->x, static_cast<float>(i));
 		assert_eq(vel->vx, static_cast<float>(i * 0.1));
@@ -341,8 +341,8 @@ inline void test_add_components()
 	pool.emplace_commands();
 
 	for (int i = 0; i < 100; ++i) {
-		position* pos = pool.get<position>(i);
-		velocity* vel = pool.get<velocity>(i);
+		position* pos = pool.get_from_owner<position>(i);
+		velocity* vel = pool.get_from_owner<velocity>(i);
 
 		assert_eq(pos->x, static_cast<float>(i));
 		assert_eq(vel->vx, static_cast<float>(i * 0.1));
@@ -399,10 +399,10 @@ inline void test_query_components()
 
 	for (int i = 0; i < 50; ++i) 
 	{
-		pool.remove<position>(i);
-		pool.remove<velocity>(i);
+		pool.remove_component<position>(i);
+		pool.remove_component<velocity>(i);
 		if (i % 2 == 0)
-			pool.remove<health>(i);
+			pool.remove_component<health>(i);
 	}
 
 	pool.emplace_commands();
@@ -427,7 +427,7 @@ inline void test_remove_components()
 	pool.emplace_commands();
 
 	for (int i = 0; i < 50; i += 2) {
-		pool.remove<health>(i);
+		pool.remove_component<health>(i);
 	}
 
 	auto query = pool.query<position, health>();
@@ -483,14 +483,14 @@ inline void test_edge_cases()
 	// Readding component what should be the behaviour?
 	pool.add<position>(0).x = 2.0f;
 
-	auto position_data = pool.get<position>(0);
+	auto position_data = pool.get_from_owner<position>(0);
 
 	assert_eq(position_data->x, 1.0f);
 
 
 	// Test removing non-existent component
 	try {
-		pool.remove<velocity>(0);
+		pool.remove_component<velocity>(0);
 		std::cout << "No exception on removing non-existent component\n";
 	}
 	catch (...) {
@@ -517,17 +517,17 @@ void test_component_lists()
 	pool.add<position>(entity).x = value_2;
 	pool.emplace_commands();
 
-	assert_eq(pool.get<position>(entity)->x,value_1);
+	assert_eq(pool.get_from_owner<position>(entity)->x,value_1);
 	assert_eq(pool.get_at<position>(entity, 1)->x, value_2);
 	assert_eq(pool.get_at<position>(entity, 0)->x, value_1);
 
 	assert_eq(pool.has<position>(entity), true);
-	pool.remove<position>(entity);
+	pool.remove_component<position>(entity);
 	pool.emplace_commands();
 
-	assert_eq(pool.get<position>(entity)->x, value_2);
+	assert_eq(pool.get_from_owner<position>(entity)->x, value_2);
 	assert_eq(pool.has<position>(entity), true);
-	pool.remove<position>(entity);
+	pool.remove_component<position>(entity);
 	pool.emplace_commands();
 
 	assert_eq(pool.has<position>(entity), false);

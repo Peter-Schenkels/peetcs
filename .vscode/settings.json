@@ -1,0 +1,29 @@
+{
+	"buildDirectory": "C:/Users/Peter Werk/Documents/Builds/peetcs",
+	"ninjaFileDirectory": "C:/Users/Peter Werk/Documents/Builds/peetcs",
+	"programName": "peetcs",
+
+	"files.associations": {
+		".env*": "dotenv",
+		"array": "cpp",
+		"format": "cpp",
+		"forward_list": "cpp",
+		"iosfwd": "cpp",
+		"iterator": "cpp",
+		"list": "cpp",
+		"ranges": "cpp",
+		"span": "cpp",
+		"system_error": "cpp",
+		"vector": "cpp",
+		"xlocale": "cpp",
+		"xstring": "cpp",
+		"xutility": "cpp",
+		"algorithm": "cpp",
+		"concepts": "cpp",
+		"memory": "cpp",
+		"xmemory": "cpp",
+		"limits": "cpp",
+		"xtr1common": "cpp",
+		"xhash": "cpp"
+	}
+}

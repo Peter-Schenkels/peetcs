@@ -1,6 +1,6 @@
 #pragma once
-#include <ranges>
 #include <unordered_map>
+#include <ranges>
 #include "generic_container.hpp"
 #include "query_value.hpp"
 
@@ -47,20 +47,27 @@ namespace peetcs
 		Component& add(const entity_id entity)
 		{
 			add_component_command command = {
-				.target= entity,
-				.component_type= type_id<Component>::id(),
-				.component_size= sizeof(Component),
-				.component_data= malloc(sizeof(Component))
+				.target = entity,
+				.component_type = type_id<Component>::id(),
+				.component_size = sizeof(Component),
+				.component_data = malloc(sizeof(Component))
 			};
 
 			*static_cast<Component*>(command.component_data) = Component{};
 
 			add_commands.push_back(command);
-			return *static_cast<Component*>(command.component_data);	
+			return *static_cast<Component*>(command.component_data);
 		}
 
 		template<typename Component>
-		Component* get(const entity_id entity)
+		Component& emplace(const entity_id entity)
+		{
+			auto rep = execute_add(entity, nullptr, type_id<Component>::id(), sizeof(Component));
+			return *rep.template get_ptr<Component>();
+		}
+
+		template<typename Component>
+		Component* get_from_owner(const entity_id entity)
 		{
 			return get_at<Component>(entity, 0);
 		}
@@ -153,13 +160,13 @@ namespace peetcs
 		}
 
 		template<typename Component>
-		void remove(entity_id entity)
+		void remove_component(entity_id entity)
 		{
-			remove_at<Component>(entity, 0);
+			remove_component_at<Component>(entity, 0);
 		}
 
 		template<typename Component>
-		void remove_at(entity_id entity, component_id index)
+		void remove_component_at(entity_id entity, component_id index)
 		{
 			auto& id = entity_archetype_lookup[entity];
 

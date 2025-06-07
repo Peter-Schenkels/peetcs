@@ -1,0 +1,42 @@
+{
+	"version": "2.0.0",
+	"command": "",
+	"args": [],
+	"tasks": [
+		{
+			"label": "Build-Debug",
+			"type": "shell",
+			"command": "ninja -d stats",
+			"presentation": {
+				"clear": true
+			},
+			"options": {
+				"cwd": "${config:ninjaFileDirectory}/Debug"
+			},
+		},
+		{			
+			"label": "Build-Release",
+			"type": "shell",
+			"command": "ninja clean ; ninja --quiet -d stats ; ./TESTER.exe",
+			"group": "build",
+			"presentation": {
+				"clear": true
+			},
+			"options": {
+				"cwd": "${config:ninjaFileDirectory}/Release"
+			},
+		},
+		{			
+			"label": "Build-Run-Release",
+			"type": "shell",
+			"command": "",
+			"presentation": {
+				"clear": true
+			},
+			"options": {
+				"cwd": "${config:ninjaFileDirectory}/Release"
+			},
+			"dependsOn": [ "Build-Release" ]
+		},
+	]
+}

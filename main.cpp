@@ -1,8 +1,15 @@
 #include <iostream>
 #include <chrono>
+#define GLEW_STATIC
+#include <GL/glew.h>
+
 #include "include/archetype_pool.hpp"
 #include "tests/unit_tests.hpp"
 #include "tests/shared.hpp"
+#include <GLFW/glfw3.h>
+#include <glm/gtx/quaternion.hpp>
+
+#include "include/pipo/rasterizer.hpp"
 
 
 struct pingas
@@ -19,31 +26,42 @@ void run_performance_simulation_test(const int entity_count)
 		int nb_of_components = 0;
 		// Measure time for adding components
 		auto start = std::chrono::high_resolution_clock::now();
+
+		int counter_3 = 0;
+		int counter_5 = 0;
+		int counter_7 = 0;
 		for (int i = 0; i < entity_count; ++i)
 		{
 			pool.add<position>(i).x = static_cast<float>(i);
 			pool.add<velocity>(i).vx = static_cast<float>(i * 0.1);
-			pool.add<pingas>(i).a = static_cast<float>(i * 0.1);
+			//pool.add<pingas>(i).a = static_cast<float>(i * 0.1);
 
 			nb_of_components += 2;
 
-			//if (i % 3 == 0)
+			if (counter_3 == 3)
 			{
 				pool.add<health>(i).points = i;
 				nb_of_components++;
+				counter_3 = -1;
 			}
 
-			//if (i % 5 == 0)
+			if (counter_5 == 5)
 			{
 				pool.add<attack>(i).damage = i * 10;
 				nb_of_components++;
+				counter_5 = -1;
 			}
 
-			//if (i % 7 == 0)
+			if (counter_7 == 7)
 			{
 				pool.add<defense>(i).armor = i * 5;
 				nb_of_components++;
+				counter_7 = -1;
 			}
+
+			counter_3++;
+			counter_5++;
+			counter_7++;
 		}
 		auto end = std::chrono::high_resolution_clock::now();
 		std::cout << "took: "
@@ -124,11 +142,11 @@ void run_performance_simulation_test(const int entity_count)
 		start = std::chrono::high_resolution_clock::now();
 		for (int i = 0; i < entity_count; i ++)
 		{
-			pool.remove<health>(i);
-			pool.remove<attack>(i);
-			pool.remove<position>(i);
-			pool.remove<velocity>(i);
-			pool.remove<defense>(i);
+			pool.remove_component<health>(i);
+			pool.remove_component<attack>(i);
+			pool.remove_component<position>(i);
+			pool.remove_component<velocity>(i);
+			pool.remove_component<defense>(i);
 		}
 		pool.emplace_commands();
 
@@ -137,15 +155,121 @@ void run_performance_simulation_test(const int entity_count)
 			<< std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
 			<< " us\n";
 	}
+
+	for (int i = 0; i < entity_count; i++)
+	{
+		while (pool.has<pingas>(i))
+		{
+			pool.remove_component<pingas>(i);
+			pool.emplace_commands();
+		}
+	}
+	std::cout << "Done" << std::endl;
+	while (true) {  }
 }
 
 int main()
 {
-	load_shared_lib();
-	//run_tests();
-	constexpr int entity_count = 1000; // Number of entities for the test
-	run_performance_simulation_test(entity_count);
+	peetcs::archetype_pool pool;
 
-	hello();
+	pipo::init();
+	pipo::create_window(1200, 800, "Hello World");
+
+	pipo::shader::allocate_settings shader_settings = {};
+	char vertex_code[] = R"(	
+#version 330 core
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+layout (location = 0) in vec3 aPos;
+
+void main()
+{
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
+})";
+
+	char fragment_code[] = R"(	
+#version 330 core
+out vec4 FragColor;
+
+void main()
+{
+    FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+} )";
+
+
+	shader_settings.vertex_shader_code = vertex_code;
+	shader_settings.fragment_shader_code = fragment_code;
+
+	pipo::mesh::allocate_settings mesh_settings = {};
+
+	float vertices[] = {
+	-0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
+	 0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
+	 0.0f,  0.5f, 0.0f, 0.0f, 0.0f,
+	};
+
+	unsigned int indices[] = {  // note that we start from 0!
+		0, 1, 2,
+	};
+
+	mesh_settings.layout = pipo::mesh::vertex_3d;
+	mesh_settings.vertices = (unsigned char*)vertices;
+	mesh_settings.indices = (unsigned char*)indices;
+	mesh_settings.nb_of_indices = 3;
+	mesh_settings.nb_of_vertices = 3;
+
+	peetcs::entity_id triangle = 0;
+	peetcs::entity_id camera = 1;
+
+	{
+		pipo::mesh_render_data& mesh_render = pool.add<pipo::mesh_render_data>(triangle);
+		mesh_render.mesh_id = pipo::resources::allocate_mesh_gpu(mesh_settings);
+
+		pipo::material_data& material = pool.add<pipo::material_data>(triangle);
+		material.program = pipo::resources::create_shader_gpu(shader_settings);
+
+		pipo::transform_data& triangle_transform = pool.add<pipo::transform_data>(triangle);
+		triangle_transform.position = { 0, 0, 0 };
+		triangle_transform.rotation = glm::quat(glm::vec3(0, 0, 0));
+		triangle_transform.scale = { 1, 1, 1 };
+
+
+		pipo::camera_data& camera_data = pool.add<pipo::camera_data>(camera);
+		pipo::transform_data& camera_transform = pool.add<pipo::transform_data>(camera);
+
+		camera_transform.position = { 0, 0, 2 };
+		camera_transform.rotation = glm::quat(glm::vec3(0, 0, 0));
+
+		camera_data.c_near = 0.1f;
+		camera_data.c_far = 100.0f;
+		camera_data.aspect = 800.0f / 600.0f; // For example
+		camera_data.fov = 60.0f;
+		camera_data.type = pipo::view_type::perspective;
+		camera_data.active = true;
+
+		pool.emplace_commands();
+	}
+
+	while (pipo::start_frame())
+	{
+		pipo::render_frame(pool);
+
+		auto camera_query = pool.query<pipo::camera_data, pipo::transform_data>();
+		for (auto camera_value : camera_query)
+		{
+			pipo::transform_data& camera_transform = camera_value.get<pipo::transform_data>();
+			camera_transform.position.x += 0.001f;
+			camera_transform.position.y += 0.001f;
+			camera_transform.position.z += 0.005f;
+			camera_transform.rotation.z -= 0.001f;
+		}
+
+	}
+
+	pipo::deinit();
+
 	return 0;
 }

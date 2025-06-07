@@ -50,7 +50,7 @@ namespace peetcs
 
 		// Scenario 3 (Entity exist already, move to a new archetype
 		{
-			element_layout memory_descriptor_old = archetype_it->second;
+			element_layout& memory_descriptor_old = archetype_it->second;
 			const auto old_block_it = blocks.find(memory_descriptor_old);
 
 			element_layout memory_descriptor_new = memory_descriptor_old;
@@ -62,7 +62,7 @@ namespace peetcs
 			{
 				if (old_block_it == blocks.end()) [[unlikely]]
 				{
-					__debugbreak();
+					halt();
 				}
 
 				blocks[memory_descriptor_new] = generic_container { memory_descriptor_new, static_cast<element_layout::index_t>(default_array_size) };

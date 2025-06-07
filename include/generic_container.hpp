@@ -1,6 +1,5 @@
 #pragma once
 #include <cstdint>
-#include <vcruntime_typeinfo.h>
 #include <vector>
 
 
@@ -167,6 +166,7 @@ struct generic_container
 	std::size_t layout_hash;
 	element_layout::index_t max = 0;
 	element_layout::index_t element_stack_index = 0;
+	element_layout::index_t initial_nb_of_elements = 0;
 
 	generic_container() = default;
 
@@ -194,7 +194,7 @@ struct generic_container
 
 	inline std::size_t size() const { return element_stack_index; }
 
-	void resize(std::size_t new_size);
+	void resize(element_layout::index_t new_size);
 
 	element_rep last() { return get_element_at(element_stack_index - 1); }
 

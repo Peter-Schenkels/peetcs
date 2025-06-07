@@ -1,0 +1,32 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "cppvsdbg",
+			"request": "launch",
+			"preLaunchTask": "Build-Debug",
+			"name": "Debug",
+			"program": "${config:buildDirectory}/Debug/TESTER-d.exe",
+			"args": [],
+			"cwd": "${workspaceFolder}",
+			"internalConsoleOptions": "openOnSessionStart",
+		},
+		{
+			"type": "cppvsdbg",
+			"request": "launch",
+			"preLaunchTask": "Build-Run-Release",
+			"name": "Release",
+			"cwd": "${workspaceFolder}",
+		},
+		{
+			"type": "node-terminal",
+			"request": "launch",
+			"name": "Clean",
+			"command": "ninja -C ./Release clean | ninja -C ./Debug clean",
+			"cwd": "${config:buildDirectory}",
+		}
+	]
+}

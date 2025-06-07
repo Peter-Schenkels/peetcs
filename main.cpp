@@ -225,17 +225,18 @@ void main()
 	peetcs::entity_id camera = 0;
 
 	pipo::shader_id shader = pipo::resources::create_shader_gpu(shader_settings);
-
 	{
-		for (int i = 0; i < 100; i++)
+		int amount = 40000;
+		for (int i = 0; i < amount; i++)
 		{
 			triangle = i + 1;
 
-			int x = i % 10;
-			int y = i / 10;
+			int x = i % (int)sqrt(amount) - sqrt(amount) / 2;
+			int y = i / (int)sqrt(amount) - sqrt(amount) / 2;
 
 			pipo::mesh_render_data& mesh_render = pool.add<pipo::mesh_render_data>(triangle);
 			mesh_render.mesh_id = pipo::resources::allocate_mesh_gpu(mesh_settings);
+			mesh_render.visible = i % 10 == 0;
 
 			pipo::material_data& material = pool.add<pipo::material_data>(triangle);
 			material.program = shader;
@@ -257,7 +258,7 @@ void main()
 		camera_transform.set_rotation(0, 0, 0);
 
 		camera_data.c_near = 0.1f;
-		camera_data.c_far = 100.0f;
+		camera_data.c_far = 1000.0f;
 		camera_data.aspect = 800.0f / 600.0f; // For example
 		camera_data.fov = 60.0f;
 		camera_data.type = pipo::view_type::perspective;
@@ -276,8 +277,15 @@ void main()
 			pipo::transform_data& camera_transform = camera_value.get<pipo::transform_data>();
 			camera_transform.position[0] += 0.001f;
 			camera_transform.position[1] += 0.001f;
-			camera_transform.position[2] += 0.010f;
+			camera_transform.position[2] += 0.100f;
 			camera_transform.rotation[2] -= 0.001f;
+		}
+
+		auto mesh_query = pool.query<pipo::mesh_render_data, pipo::transform_data>();
+		for (auto query : mesh_query)
+		{
+			pipo::transform_data& transform = query.get<pipo::transform_data>();
+			transform.rotation[2] += 1.f;
 		}
 	}
 

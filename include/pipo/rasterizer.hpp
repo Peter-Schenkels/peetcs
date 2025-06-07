@@ -78,6 +78,7 @@ public:
 	struct mesh_render_data
 	{
 		mesh_id mesh_id;
+		bool visible;
 	};
 
 	struct render_texture_data

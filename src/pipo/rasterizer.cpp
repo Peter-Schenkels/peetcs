@@ -165,6 +165,12 @@ void pipo::render_misc_material_meshes(peetcs::archetype_pool& pool)
         auto query = pool.query<material_data, transform_data, mesh_render_data>();
         for (auto query_value : query)
         {
+            const auto& mesh_renderer = query_value.get<mesh_render_data>();
+            if (!mesh_renderer.visible)
+            {
+	            continue;
+            }
+
             const auto& material = query_value.get<material_data>();
             GL_CALL(glUseProgram(material.program));
             int loc_model = glGetUniformLocation(material.program, "model");
@@ -184,7 +190,7 @@ void pipo::render_misc_material_meshes(peetcs::archetype_pool& pool)
             glm::mat4 model = get_model(transform);
             GL_CALL(glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm::value_ptr(model)));
 
-            const auto& mesh_renderer = query_value.get<mesh_render_data>();
+
 
             GL_CALL(glBindVertexArray(mesh_renderer.mesh_id.vertex_array_object));
             glDrawElements(GL_TRIANGLES, mesh_renderer.mesh_id.nb_of_indices, GL_UNSIGNED_INT, 0);

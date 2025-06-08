@@ -223,7 +223,7 @@ int main()
 
 		camera_data.c_near = 0.1f;
 		camera_data.c_far = 1000.0f;
-		camera_data.aspect = 1920 / 1080; // For example
+		camera_data.aspect = 1920.f / 1080; // For example
 		camera_data.fov = 60.0f;
 		camera_data.type = pipo::view_type::perspective;
 		camera_data.active = true;
@@ -241,7 +241,7 @@ int main()
 			pipo::transform_data& camera_transform = camera_value.get<pipo::transform_data>();
 			camera_transform.position[0] += 0.001f;
 			camera_transform.position[1] += 0.001f;
-			camera_transform.position[2] += 0.050f;
+			camera_transform.position[2] += 0.010f;
 			camera_transform.rotation[2] -= 0.001f;
 		}
 

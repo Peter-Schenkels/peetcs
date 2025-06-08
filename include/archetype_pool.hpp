@@ -48,7 +48,7 @@ namespace peetcs
 		{
 			add_component_command command = {
 				.target = entity,
-				.component_type = type_id<Component>::id(),
+				.component_type = Component::id,
 				.component_size = sizeof(Component),
 				.component_data = malloc(sizeof(Component))
 			};
@@ -62,7 +62,7 @@ namespace peetcs
 		template<typename Component>
 		Component& emplace(const entity_id entity)
 		{
-			auto rep = execute_add(entity, nullptr, type_id<Component>::id(), sizeof(Component));
+			auto rep = execute_add(entity, nullptr, Component::id, sizeof(Component));
 			return *rep.template get_ptr<Component>();
 		}
 
@@ -75,7 +75,7 @@ namespace peetcs
 		template<typename Component>
 		Component* get_at(const entity_id entity, const component_id index)
 		{
-			const auto& component_type = type_id<Component>::id();
+			const auto& component_type = Component::id;
 
 			// Scenario 1 (Component is in an archetype)
 			auto archetype_it = entity_archetype_lookup.find(entity);
@@ -89,7 +89,7 @@ namespace peetcs
 						auto entity_containers_it = list_blocks.find(entity);
 						if ( entity_containers_it != list_blocks.end())
 						{
-							auto component_list_it = entity_containers_it->second.find(type_id<Component>::id());
+							auto component_list_it = entity_containers_it->second.find(Component::id);
 							if (component_list_it != entity_containers_it->second.end())
 							{
 								component_id index_in_list = index - 1;
@@ -140,7 +140,7 @@ namespace peetcs
 		{
 			for (auto& element_layout : blocks | std::views::keys)
 			{
-				if ((element_layout.contains(type_id<Components>::id()) && ...))
+				if ((element_layout.contains(Components::id) && ...))
 				{
 					archetypes.push_back(element_layout);
 				}
@@ -153,7 +153,7 @@ namespace peetcs
 			auto archetype_it = entity_archetype_lookup.find(entity);
 			if (archetype_it != entity_archetype_lookup.end())
 			{
-				return archetype_it->second.contains(type_id<Component>::id());
+				return archetype_it->second.contains(Component::id);
 			}
 
 			return false;
@@ -170,12 +170,12 @@ namespace peetcs
 		{
 			auto& id = entity_archetype_lookup[entity];
 
-			if (!id.contains(type_id<Component>::id())) [[unlikely]]
+			if (!id.contains(Component::id)) [[unlikely]]
 				return;
 
 			remove_component_command command = {
 				.target = entity,
-				.component_type = type_id<Component>::id(),
+				.component_type = Component::id,
 				.list_index = index
 			};
 

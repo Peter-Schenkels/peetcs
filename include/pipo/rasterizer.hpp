@@ -51,6 +51,8 @@ public:
 	// interface data
 	struct camera_data
 	{
+		constexpr static uint16_t id = 2;
+
 		view_type type;
 		float fov;
 		float c_near;
@@ -62,6 +64,8 @@ public:
 
 	struct transform_data
 	{
+		constexpr static uint16_t id = 1;
+
 		float position[3] = {0, 0, 0};
 		float scale[3] = { 0, 0, 0 };
 		float rotation[3] = { 0, 0, 0 };
@@ -77,23 +81,31 @@ public:
 
 	struct mesh_render_data
 	{
+		constexpr static uint16_t id = 0;
+
 		mesh_id mesh_id;
 		bool visible;
 	};
 
 	struct render_texture_data
 	{
+		constexpr static uint16_t id = 3;
+
 		texture_id main_texture;
 	};
 
 	struct lit_material_data
 	{
+		constexpr static uint16_t id = 4;
+
 		texture_id main_texture;
 		texture_id normal_texture;
 	};
 
 	struct unlit_material_data
 	{
+		constexpr static uint16_t id = 5;
+
 		texture_id main_texture;
 
 		static shader_id program;
@@ -101,11 +113,15 @@ public:
 
 	struct material_data
 	{
+		constexpr static uint16_t id = 6;
+
 		shader_id program;
 	};
 
 	struct glfw_window_data
 	{
+		constexpr static uint16_t id = 7;
+
 		void* window;
 		glm::vec2 size;
 	};
@@ -276,3 +292,18 @@ struct std::hash<pipo::mesh_id>
 {
 	std::size_t operator()(const pipo::mesh_id& id) const noexcept;
 };
+
+
+/*#define DECLARE_TYPE_ID(type, idval) \
+	struct type { \
+		static constexpr HASH_VALUE_TYPE id() { return static_cast<HASH_VALUE_TYPE>(idval); } \
+	};*/
+
+/*DECLARE_TYPE_ID(pipo::transform_data, 022)
+DECLARE_TYPE_ID(pipo::mesh_render_data, 1212)
+DECLARE_TYPE_ID(pipo::material_data, 2112)
+DECLARE_TYPE_ID(pipo::unlit_material_data, 312)
+DECLARE_TYPE_ID(pipo::lit_material_data, 412)
+DECLARE_TYPE_ID(pipo::camera_data, 5112)*/
+
+

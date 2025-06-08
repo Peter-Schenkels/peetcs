@@ -1,5 +1,7 @@
 #include "include/pipo/imgui.hpp"
 
+#include "tests/shared.hpp"
+
 void performance_profiler::draw(peetcs::archetype_pool& pool)
 {
 	time.tick();
@@ -14,3 +16,4 @@ void performance_profiler::draw(peetcs::archetype_pool& pool)
 	ImGui::Text(text_buffer);
 	ImGui::End();
 }
+

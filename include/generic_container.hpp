@@ -8,13 +8,18 @@ void halt();
 
 #define HASH_VALUE_TYPE uint16_t
 
-template <class C>
-struct type_id {
+//template <class C>
+/*struct type_id {
 	constexpr static int _id{};
 	constexpr static HASH_VALUE_TYPE id() {
 		return reinterpret_cast<HASH_VALUE_TYPE>(&_id);
 	}
-};
+};*/
+
+#ifdef max
+#undef max
+#endif
+
 
 struct element_layout
 {
@@ -52,7 +57,7 @@ struct element_layout
 		template<typename T>
 		static type_info init()
 		{
-			return type_info { type_id<T>::id(), sizeof(T)};
+			return type_info { T::id, sizeof(T)};
 		}
 	};
 
@@ -77,7 +82,7 @@ struct element_layout
 	template <typename T>
 	void add()
 	{
-		add(type_id<T>::id(), sizeof(T));
+		add(T::id, sizeof(T));
 	}
 
 	bool contains(const hash_t& type) const;
@@ -89,7 +94,7 @@ struct element_layout
 
 	bool operator==(const element_layout& other) const
 	{
-		if (other.layout.empty())
+		if (layout.empty())
 		{
 			return other.layout.empty() && layout.empty();
 		}
@@ -139,7 +144,7 @@ struct generic_container
 		template<typename T>
 		void set(const T& new_data)
 		{
-			set_generic_ptr(type_id<T>::id(), sizeof(T), &new_data);
+			set_generic_ptr(T::id, sizeof(T), &new_data);
 		}
 
 		void set_generic_ptr(const element_layout::hash_t type, const std::size_t stride, const void* new_data);
@@ -149,7 +154,7 @@ struct generic_container
 		{
 			verify_ptr();
 
-			T* sub_element_ptr = static_cast<T*>(element_layout::get_sub_element(type_id<T>::id(), static_cast<uint8_t*>(element_ptr)));
+			T* sub_element_ptr = static_cast<T*>(element_layout::get_sub_element(T::id, static_cast<uint8_t*>(element_ptr)));
 			return *sub_element_ptr;
 		}
 
@@ -158,7 +163,7 @@ struct generic_container
 		{
 			verify_ptr();
 
-			T* sub_element_ptr = static_cast<T*>(element_layout::get_sub_element(type_id<T>::id(), static_cast<uint8_t*>(element_ptr)));
+			T* sub_element_ptr = static_cast<T*>(element_layout::get_sub_element(T::id, static_cast<uint8_t*>(element_ptr)));
 			return sub_element_ptr;
 		}
 
@@ -234,4 +239,3 @@ struct generic_container
 
 	iterator begin();
 };
-

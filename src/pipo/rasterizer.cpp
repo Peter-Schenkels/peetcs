@@ -210,7 +210,7 @@ void pipo::render_imgui(peetcs::archetype_pool& pool, std::vector<std::shared_pt
     ImGui::NewFrame();
 
 	// GUI Content
-    for (auto& gui : guis)
+    for (const auto& gui : guis)
     {
         gui->draw(pool);
     }

@@ -1,6 +1,8 @@
 #pragma once
 #include <chrono>
 
+#include "pipo/imgui.hpp"
+
 struct time_info
 {
 	using clock = std::chrono::high_resolution_clock;

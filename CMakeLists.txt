@@ -81,23 +81,6 @@ add_project(PEETCS
             SOURCES ${SRC_LIB_PEETCS}
             DEPENDS )
 
-
-
-# FILE GROUP SRC_TESTS
-set(SRC_SHARED
-	"tests/shared.hpp"
-	"src/shared.cpp"
-)
-
-source_group("Shared" FILES ${SRC_SHARED})
-
-# define the target
-add_project(SHARED
-            SHARED_LIB
-            SOURCES ${SRC_SHARED}
-            DEPENDS )
-
-
 # FILE GROUP SRC_PEETCS
 set(SRC_MAIN
 	"CMakeLists.txt"
@@ -153,8 +136,25 @@ target_include_directories(PIPO PRIVATE external/glm external/stb external/obj_l
 source_group("Main" FILES ${SRC_MAIN})
 
 
+
+
+# FILE GROUP SRC_TESTS
+set(SRC_SHARED
+    "include/dll_macros.hpp"
+	"tests/shared.hpp"
+	"src/shared.cpp"
+)
+
+source_group("Shared" FILES ${SRC_SHARED})
+
+# define the target
+add_project(PHESYCS
+            SHARED_LIB
+            SOURCES ${SRC_SHARED}
+            DEPENDS PEETCS PIPO)
+
 # define the target
 add_project(TESTER
             COMMAND 
             SOURCES ${SRC_MAIN}
-            DEPENDS PEETCS PIPO)
+            DEPENDS PEETCS PIPO PHESYCS)

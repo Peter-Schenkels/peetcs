@@ -16,6 +16,7 @@
             while ((err = glGetError()) != GL_NO_ERROR) { \
                 std::cerr << "OpenGL error 0x" << std::hex << err \
                           << " at " << __FILE__ << ":" << std::dec << __LINE__ << std::endl; \
+						  	__debugbreak(); \
             }                                 \
         } while(0)
 #endif
@@ -56,10 +57,6 @@ public:
 	};
 
 
-
-
-
-
 	struct transform_data
 	{
 		float position[3] = {0, 0, 0};
@@ -95,6 +92,8 @@ public:
 	struct unlit_material_data
 	{
 		texture_id main_texture;
+
+		static shader_id program;
 	};
 
 	struct material_data
@@ -199,6 +198,8 @@ public:
 		static shader_id load_shader_gpu(const shader::load_settings& settings);
 		static shader_id create_shader_gpu(const shader::allocate_settings& settings);
 
+		static void init_default_resources();
+
 		static std::unordered_map<texture_id, texture>  textures;
 		static std::unordered_map<mesh_id,    mesh>     meshes;
 		static std::unordered_map<shader_id,  shader>   shaders;
@@ -226,8 +227,9 @@ public:
 
 private:
 	static void render_misc_material_meshes(peetcs::archetype_pool& pool);
-
+	static void render_unlit_material_meshes(peetcs::archetype_pool& pool);
 };
+
 
 inline void pipo::transform_data::set_rotation(float pitch, float yaw, float roll)
 {

@@ -173,60 +173,26 @@ int main()
 	peetcs::archetype_pool pool;
 
 	pipo::init();
-	pipo::create_window(1200, 800, "Hello World");
-
-	pipo::shader::allocate_settings shader_settings = {};
-	char vertex_code[] = R"(	
-#version 330 core
-
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-
-layout (location = 0) in vec3 aPos;
-
-void main()
-{
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
-})";
-
-	char fragment_code[] = R"(	
-#version 330 core
-out vec4 FragColor;
-
-void main()
-{
-    FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
-} )";
-
-
-	shader_settings.vertex_shader_code = vertex_code;
-	shader_settings.fragment_shader_code = fragment_code;
-
-	pipo::mesh::allocate_settings mesh_settings = {};
-
-	float vertices[] = {
-	-0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
-	 0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
-	 0.0f,  0.5f, 0.0f, 0.0f, 0.0f,
-	};
-
-	unsigned int indices[] = {  // note that we start from 0!
-		0, 1, 2,
-	};
-
-	mesh_settings.layout = pipo::mesh::vertex_3d;
-	mesh_settings.vertices = (unsigned char*)vertices;
-	mesh_settings.indices = (unsigned char*)indices;
-	mesh_settings.nb_of_indices = 3;
-	mesh_settings.nb_of_vertices = 3;
+	pipo::create_window(1920, 1080, "Hello World");
+	pipo::resources::init_default_resources();
 
 	peetcs::entity_id triangle = 1;
 	peetcs::entity_id camera = 0;
 
-	pipo::shader_id shader = pipo::resources::create_shader_gpu(shader_settings);
+	pipo::mesh::load_settings mesh_settings;
+	char mesh_filepath[] = R"(K:\Users\Peter Werk\Documents\GitHub\peetcs\Assets\models\carkel.obj)";
+	mesh_settings.file_path = mesh_filepath;
+
+	pipo::texture::load_settings texture_settings;
+	char texture_filepath[] = R"(K:\Users\Peter Werk\Documents\GitHub\peetcs\Assets\textures\carkel texture.png)";
+	texture_settings.file_path = texture_filepath;
+	pipo::texture_id carkel_texture = pipo::resources::load_texture_gpu(texture_settings);
+
+	std::vector<pipo::mesh_id> meshes;
+	pipo::resources::load_mesh_gpu(mesh_settings, meshes);
+
 	{
-		int amount = 40000;
+		int amount = 4000;
 		for (int i = 0; i < amount; i++)
 		{
 			triangle = i + 1;
@@ -235,21 +201,19 @@ void main()
 			int y = i / (int)sqrt(amount) - sqrt(amount) / 2;
 
 			pipo::mesh_render_data& mesh_render = pool.add<pipo::mesh_render_data>(triangle);
-			mesh_render.mesh_id = pipo::resources::allocate_mesh_gpu(mesh_settings);
-			mesh_render.visible = i % 10 == 0;
+			mesh_render.mesh_id = meshes.front();
+			mesh_render.visible = i % 1 == 0;
 
-			pipo::material_data& material = pool.add<pipo::material_data>(triangle);
-			material.program = shader;
+			pipo::unlit_material_data& material = pool.add<pipo::unlit_material_data>(triangle);
+			material.main_texture = carkel_texture;
 
 			pipo::transform_data& triangle_transform = pool.add<pipo::transform_data>(triangle);
 			triangle_transform.set_pos(x, y, 0 );
 			triangle_transform.set_rotation(x,y, 0);
-			triangle_transform.set_scale(1, 1, 1);
+			triangle_transform.set_scale(0.1, 0.1, 0.1);
 
 			pool.emplace_commands();
 		}
-
-
 
 		pipo::camera_data& camera_data = pool.add<pipo::camera_data>(camera);
 		pipo::transform_data& camera_transform = pool.add<pipo::transform_data>(camera);
@@ -259,7 +223,7 @@ void main()
 
 		camera_data.c_near = 0.1f;
 		camera_data.c_far = 1000.0f;
-		camera_data.aspect = 800.0f / 600.0f; // For example
+		camera_data.aspect = 1920 / 1080; // For example
 		camera_data.fov = 60.0f;
 		camera_data.type = pipo::view_type::perspective;
 		camera_data.active = true;
@@ -277,7 +241,7 @@ void main()
 			pipo::transform_data& camera_transform = camera_value.get<pipo::transform_data>();
 			camera_transform.position[0] += 0.001f;
 			camera_transform.position[1] += 0.001f;
-			camera_transform.position[2] += 0.100f;
+			camera_transform.position[2] += 0.050f;
 			camera_transform.rotation[2] -= 0.001f;
 		}
 
@@ -285,7 +249,7 @@ void main()
 		for (auto query : mesh_query)
 		{
 			pipo::transform_data& transform = query.get<pipo::transform_data>();
-			transform.rotation[2] += 1.f;
+			transform.rotation[2] += 0.1f;
 		}
 	}
 

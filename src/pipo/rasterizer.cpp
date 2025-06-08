@@ -26,7 +26,68 @@ std::unordered_map<pipo::texture_id, pipo::texture> pipo::resources::textures = 
 std::unordered_map<pipo::mesh_id, pipo::mesh>       pipo::resources::meshes = {};
 std::unordered_map<pipo::shader_id, pipo::shader>   pipo::resources::shaders = {};
 void*   pipo::resources::window = {};
+pipo::shader_id pipo::unlit_material_data::program = -1;
 
+
+char vertex_shader_unlit_code[] =
+R"(	#version 330 core
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
+layout (location = 2) in vec2 aTexCoord;
+
+out vec2 TexCoord;
+out vec3 Normal;
+
+void main()
+{
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
+	TexCoord = aTexCoord;
+	Normal = aNormal;
+})";
+
+char fragment_shader_unlit_code[] = R"(	
+#version 330 core
+out vec4 FragColor;
+in vec2 TexCoord;
+in vec3 Normal;
+uniform sampler2D main_texture;
+
+void main()
+{
+    FragColor = texture(main_texture, TexCoord);
+} )";
+
+
+
+
+void compile_unlit_shader()
+{
+    pipo::shader::allocate_settings shader_settings = {};
+    shader_settings.vertex_shader_code = vertex_shader_unlit_code;
+    shader_settings.fragment_shader_code = fragment_shader_unlit_code;
+    pipo::shader_id shader = pipo::resources::create_shader_gpu(shader_settings);
+
+    pipo::unlit_material_data::program = shader;
+}
+
+
+void pipo::resources::init_default_resources()
+{
+    stbi_set_flip_vertically_on_load(true);
+    compile_unlit_shader();
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+}
 
 bool pipo::init()
 {
@@ -38,6 +99,7 @@ bool pipo::init()
         std::cerr << "Failed to initialize GLFW\n";
         return -1;
     }
+
 
 	return true;
 }
@@ -172,7 +234,7 @@ void pipo::render_misc_material_meshes(peetcs::archetype_pool& pool)
             }
 
             const auto& material = query_value.get<material_data>();
-            GL_CALL(glUseProgram(material.program));
+            GL_CALL(glUseProgram(pipo::unlit_material_data::program));
             int loc_model = glGetUniformLocation(material.program, "model");
 
             if (!camera_uniforms_set)
@@ -191,7 +253,6 @@ void pipo::render_misc_material_meshes(peetcs::archetype_pool& pool)
             GL_CALL(glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm::value_ptr(model)));
 
 
-
             GL_CALL(glBindVertexArray(mesh_renderer.mesh_id.vertex_array_object));
             glDrawElements(GL_TRIANGLES, mesh_renderer.mesh_id.nb_of_indices, GL_UNSIGNED_INT, 0);
             GL_CALL(glBindVertexArray(0));
@@ -199,9 +260,71 @@ void pipo::render_misc_material_meshes(peetcs::archetype_pool& pool)
 	}
 }
 
+
+void pipo::render_unlit_material_meshes(peetcs::archetype_pool& pool)
+{
+    auto camera_query = pool.query<camera_data, transform_data>();
+    for (auto camera_value : camera_query)
+    {
+        const camera_data& camera = camera_value.get<camera_data>();
+
+        if (!camera.active)
+        {
+            return;
+        }
+
+        const transform_data& camera_transform = camera_value.get<transform_data>();
+
+        glm::mat4 view = get_view(camera_transform);
+        glm::mat4 projection = get_projection(camera);
+        bool camera_uniforms_set = false;
+
+        auto query = pool.query<unlit_material_data, transform_data, mesh_render_data>();
+
+        GL_CALL(glUseProgram(unlit_material_data::program));
+        int loc_model = glGetUniformLocation(unlit_material_data::program, "model");
+        int loc_view = glGetUniformLocation(unlit_material_data::program, "view");
+        int loc_proj = glGetUniformLocation(unlit_material_data::program, "projection");
+        int loc_main_texture = glGetUniformLocation(unlit_material_data::program, "main_texture");
+        GL_CALL(glUniform1i(loc_main_texture, 0));
+
+        for (auto query_value : query)
+        {
+            const auto& mesh_renderer = query_value.get<mesh_render_data>();
+            if (!mesh_renderer.visible)
+            {
+                continue;
+            }
+
+            if (!camera_uniforms_set)
+            {
+                GL_CALL(glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm::value_ptr(view)));
+                GL_CALL(glUniformMatrix4fv(loc_proj, 1, GL_FALSE, glm::value_ptr(projection)));
+
+                camera_uniforms_set = true;
+            }
+
+            const auto& material = query_value.get<unlit_material_data>();
+            GL_CALL(glActiveTexture(GL_TEXTURE0));
+            GL_CALL(glBindTexture(GL_TEXTURE_2D, material.main_texture));
+
+
+            const transform_data& transform = query_value.get<transform_data>();
+            glm::mat4 model = get_model(transform);
+            GL_CALL(glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm::value_ptr(model)));
+
+
+            GL_CALL(glBindVertexArray(mesh_renderer.mesh_id.vertex_array_object));
+            glDrawElements(GL_TRIANGLES, mesh_renderer.mesh_id.nb_of_indices, GL_UNSIGNED_INT, 0);
+            GL_CALL(glBindVertexArray(0));
+        }
+    }
+}
+
 void pipo::render_frame(peetcs::archetype_pool& pool)
 {
     render_misc_material_meshes(pool);
+    render_unlit_material_meshes(pool);
 }
 
 std::size_t std::hash<pipo::mesh_id>::operator()(const pipo::mesh_id& id) const noexcept
@@ -242,6 +365,18 @@ pipo::texture_id pipo::resources::allocate_texture_gpu(const texture::allocate_s
     glGenTextures(1, &loaded_texture.id);
     glBindTexture(GL_TEXTURE_2D, loaded_texture.id);
 
+    GLenum format;
+    switch (settings.nb_of_channels) {
+    case 1: format = GL_RED; break;
+    case 3: format = GL_RGB; break;
+    case 4: format = GL_RGBA; break;
+    default:
+        std::cerr << "Unsupported number of channels: " << settings.nb_of_channels << std::endl;
+        stbi_image_free(settings.data);
+        return 0; // or an invalid texture ID
+    }
+
+
     // set the texture wrapping/filtering options (on the currently bound texture object)
     if (settings.clamp_borders) {
         GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER));
@@ -261,7 +396,8 @@ pipo::texture_id pipo::resources::allocate_texture_gpu(const texture::allocate_s
     GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
 
     if (settings.data) {
-        GL_CALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, settings.width, settings.height, 0, GL_RGB, GL_UNSIGNED_BYTE, settings.data));
+        GL_CALL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+        GL_CALL(glTexImage2D(GL_TEXTURE_2D, 0, format, settings.width, settings.height, 0, format, GL_UNSIGNED_BYTE, settings.data));
 
         if (settings.generate_mipmaps) {
             GL_CALL(glGenerateMipmap(GL_TEXTURE_2D));
@@ -397,6 +533,9 @@ pipo::mesh_id pipo::resources::allocate_mesh_gpu(const mesh::allocate_settings& 
         // vertex positions
         GL_CALL(glEnableVertexAttribArray(index));
         GL_CALL(glVertexAttribPointer(index, 2, GL_FLOAT, GL_FALSE, vertex_size, nullptr));
+
+        index++;
+        offset += 2;
         break;
     case mesh::vertex_2d_normal:
         // vertex positions
@@ -408,11 +547,19 @@ pipo::mesh_id pipo::resources::allocate_mesh_gpu(const mesh::allocate_settings& 
 
         GL_CALL(glEnableVertexAttribArray(index));
         GL_CALL(glVertexAttribPointer(index, 2, GL_FLOAT, GL_FALSE, vertex_size, (void*)(offset * sizeof(float))));
+
+        index++;
+        offset += 2;
         break;
     case mesh::vertex_3d:
         // vertex positions
         GL_CALL(glEnableVertexAttribArray(index));
         GL_CALL(glVertexAttribPointer(index, 3, GL_FLOAT, GL_FALSE, vertex_size, nullptr));
+
+        // Set index and offset for the UV coordinate parameter;
+        index++;
+        offset += 3;
+
         break;
     case mesh::vertex_3d_normal:
         // vertex positions
@@ -425,12 +572,13 @@ pipo::mesh_id pipo::resources::allocate_mesh_gpu(const mesh::allocate_settings& 
         // vertex normals
         GL_CALL(glEnableVertexAttribArray(index));
         GL_CALL(glVertexAttribPointer(index, 3, GL_FLOAT, GL_FALSE, vertex_size, (void*)(offset * sizeof(float))));
+
+        // Set index and offset for the UV coordinate parameter;
+        index++;
+        offset += 3;
+
         break;
     }
-
-    // Set index and offset for the UV coordinate parameter;
-    index++;
-    offset += 2;
 
     // Vertex UV Texture coordinates
     GL_CALL(glEnableVertexAttribArray(index));

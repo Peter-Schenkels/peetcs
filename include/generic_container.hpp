@@ -89,6 +89,11 @@ struct element_layout
 
 	bool operator==(const element_layout& other) const
 	{
+		if (other.layout.empty())
+		{
+			return other.layout.empty() && layout.empty();
+		}
+
 		if (cached_hash == std::numeric_limits<std::size_t>::max() || other.cached_hash == std::numeric_limits<std::size_t>::max())
 		{
 			halt();
@@ -102,7 +107,7 @@ struct std::hash<element_layout>
 {
 	std::size_t operator()(const element_layout& k) const noexcept
 	{
-		if (k.cached_hash == std::numeric_limits<std::size_t>::max())
+		if (k.cached_hash == std::numeric_limits<std::size_t>::max() && !k.layout.empty())
 		{
 			halt();
 		}

@@ -199,11 +199,11 @@ namespace peetcs
 			class iterator
 			{
 			public:
-				using iterator_category = std::forward_iterator_tag; // Iterator type_id (e.g., forward, bidirectional, etc.)
-				using value_type = query_value;                                // Type of the elements
-				using difference_type = std::ptrdiff_t;              // Type for representing differences between iterators
-				using pointer = query_value*;                                  // Pointer to the element type_id
-				using reference = query_value&;                                // Reference to the element type_id
+				using iterator_category = std::forward_iterator_tag;
+				using value_type = query_value;                                
+				using difference_type = std::ptrdiff_t; 
+				using pointer = query_value*;                                  
+				using reference = query_value&;                                
 
 				std::vector<element_layout>::iterator archetype_it;
 				std::vector<element_layout>::iterator archetype_it_end;
@@ -299,6 +299,17 @@ namespace peetcs
 
 			iterator begin()
 			{
+				if (archetype_traversal.empty())
+				{
+					pool.blocks.try_emplace(element_layout{});
+
+					return iterator(*this,
+						archetype_traversal.end(),
+						archetype_traversal.end(),
+						pool.blocks[element_layout{}].end(),
+						pool.blocks[element_layout{}].end());
+				}
+
 				return iterator{ *this };
 			}
 

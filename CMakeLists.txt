@@ -18,6 +18,7 @@ include(CMake/AddProjectMacro/Macros.cmake)
 # Add all sources and headers #
 ##############################
 
+
 # FILE GROUP SRC_CMAKEGEN
 set(SRC_CMAKEGEN
 	"CMakeGen/CMakeLists.template"
@@ -31,16 +32,19 @@ set(SRC_INCLUDE
 	"include/archetype_pool.hpp"
 	"include/query_value.hpp"
 	"include/generic_container.hpp"
+    "include/utilities.hpp"
 )
 
 # FILE GROUP SRC_INCLUDE_PIPO_RASTERIZER
 set(SRC_INCLUDE_PIPO_RASTERIZER
 	"include/pipo/rasterizer.hpp"
+    "include/pipo/imgui.hpp"
 )
 
 # FILE GROUP SRC_SRC
 set(SRC_SRC_PIPO
 	"src/pipo/rasterizer.cpp"
+    "src/pipo/imgui.cpp"
 )
 
 
@@ -126,7 +130,10 @@ link_directories(${GLFW_LIB_DIR})
 
 # Add path to GLEW include files
 include_directories(${CMAKE_SOURCE_DIR}/external/glew/include)
-include_directories(external/glm external/stb external/obj_loader)
+# Add imgui
+add_subdirectory(${CMAKE_SOURCE_DIR}/external/imgui)
+
+include_directories(external/glm external/stb external/obj_loader external/imgui)
 
 # Add path to GLEW libraries
 link_directories(${CMAKE_SOURCE_DIR}/external/glew/lib/Release/x64)
@@ -137,7 +144,7 @@ set(SRC_LIB_PIPO_RASTERIZER ${SRC_INCLUDE} ${SRC_INCLUDE_PIPO_RASTERIZER} ${SRC_
 add_project(PIPO
             STATIC_LIB 
             SOURCES ${SRC_LIB_PIPO_RASTERIZER}
-            DEPENDS PEETCS ${GLFW_LIB} glew32s opengl32)
+            DEPENDS PEETCS ${GLFW_LIB} glew32s opengl32 imgui)
 
 			
 target_include_directories(PIPO PRIVATE external/glm external/stb external/obj_loader)

@@ -18,6 +18,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+#include "include/pipo/imgui.hpp"
 
 #include <iostream>
 #include <sstream>
@@ -126,6 +127,16 @@ bool pipo::create_window(int width, int height, const char* title)
         return -1;
     }
 
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGui::StyleColorsDark(); // or ImGui::StyleColorsClassic();
+
+    // Setup ImGui backends
+    ImGui_ImplGlfw_InitForOpenGL((GLFWwindow*)resources::window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+
 }
 
 bool pipo::set_window_size(int width, int height, char* title)
@@ -191,15 +202,32 @@ glm::mat4 get_model(const pipo::transform_data& transform)
     return model_matrix;
 }
 
+void pipo::render_imgui(peetcs::archetype_pool& pool, std::vector<std::shared_ptr<gui_interface>> guis)
+{
+    // Start the ImGui frame
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+	// GUI Content
+    for (auto& gui : guis)
+    {
+        gui->draw(pool);
+    }
+
+	// Render
+	ImGui::Render();
+}
+
 bool pipo::start_frame()
 {
     glfwSwapBuffers((GLFWwindow*)pipo::resources::window);
     glfwPollEvents();
 
-
     if (!glfwWindowShouldClose((GLFWwindow*)pipo::resources::window))
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         return true;
     }
 
@@ -325,6 +353,8 @@ void pipo::render_frame(peetcs::archetype_pool& pool)
 {
     render_misc_material_meshes(pool);
     render_unlit_material_meshes(pool);
+
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 std::size_t std::hash<pipo::mesh_id>::operator()(const pipo::mesh_id& id) const noexcept

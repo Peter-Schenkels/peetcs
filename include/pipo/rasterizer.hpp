@@ -1,8 +1,11 @@
 #pragma once
 
+
+
 #include <glm/vec3.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include "imgui.hpp"
 #include "include/archetype_pool.hpp"
 
 #undef NDEBUG
@@ -222,6 +225,7 @@ public:
 
 	static void render_texture_to_window(const glfw_window_data& window, const render_texture_data& target_texture);
 
+	static void render_imgui(peetcs::archetype_pool& pool, std::vector<std::shared_ptr<gui_interface>> guis);
 	static bool start_frame();
 	static void render_frame(peetcs::archetype_pool& pool);
 

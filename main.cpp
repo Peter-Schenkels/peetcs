@@ -9,6 +9,7 @@
 #include <GLFW/glfw3.h>
 #include <glm/gtx/quaternion.hpp>
 
+#include "include/pipo/imgui.hpp"
 #include "include/pipo/rasterizer.hpp"
 
 
@@ -192,7 +193,7 @@ int main()
 	pipo::resources::load_mesh_gpu(mesh_settings, meshes);
 
 	{
-		int amount = 4000;
+		int amount = 100;
 		for (int i = 0; i < amount; i++)
 		{
 			triangle = i + 1;
@@ -231,8 +232,13 @@ int main()
 		pool.emplace_commands();
 	}
 
+	std::vector<std::shared_ptr<gui_interface>> debug_guis = {
+		std::make_unique<performance_profiler>()
+	};
+
 	while (pipo::start_frame())
 	{
+		pipo::render_imgui(pool, debug_guis);
 		pipo::render_frame(pool);
 
 		auto camera_query = pool.query<pipo::camera_data, pipo::transform_data>();
@@ -241,7 +247,7 @@ int main()
 			pipo::transform_data& camera_transform = camera_value.get<pipo::transform_data>();
 			camera_transform.position[0] += 0.001f;
 			camera_transform.position[1] += 0.001f;
-			camera_transform.position[2] += 0.010f;
+			camera_transform.position[2] += 0.10f;
 			camera_transform.rotation[2] -= 0.001f;
 		}
 

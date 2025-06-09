@@ -110,6 +110,11 @@ int main()
 			pipo::transform_data& transform = query.get<pipo::transform_data>();
 			transform.rotation[2] += 0.1f;
 		}
+
+		if (phesycs::loaded)
+		{
+			phesycs::tick(pool);
+		}
 	}
 
 	// Exit

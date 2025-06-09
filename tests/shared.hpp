@@ -8,6 +8,7 @@ API_DECLARE_FUNC(void, tick, peetcs::archetype_pool&)
 
 struct phesycs
 {
+	inline static bool loaded = false;
 	inline static HMODULE dll;
 
 	static int load_dll()
@@ -21,6 +22,7 @@ struct phesycs
 	static void release_dll()
 	{
 		FreeLibrary(dll);
+		loaded = false;
 	}
 
 	static void tick(peetcs::archetype_pool& pool)

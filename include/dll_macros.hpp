@@ -23,14 +23,16 @@
 	if (!dll) {\
 		std::cerr << #dllName " - Failed to load DLL!" << std::endl;\
 		return 1;\
-	}
+	}\
+	loaded = true;
 #else
 #define API_LOAD_DLL()\
 	dll = LoadLibrary(#dllName".dll");\
 	if (!dll) {\
 		std::cerr << #dllName " - Failed to load DLL!" << std::endl;\
 		return 1;\
-	}
+	}\
+	loaded = true;
 #endif
 
 #define API_DEFINE_FUNC(func)\

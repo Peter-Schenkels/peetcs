@@ -26,7 +26,7 @@ public:
 	void draw(peetcs::archetype_pool& pool) override;
 };
 
-template<class T>
+template<class ... T>
 class dll_reloader final : public gui_interface
 {
 	static bool replace(std::string& str, const std::string& from, const std::string& to) {
@@ -39,42 +39,45 @@ class dll_reloader final : public gui_interface
 
 
 public:
-	void inline draw(peetcs::archetype_pool& pool) override
+
+	template<class DLL, class ... OTHERS>
+	static void draw_dll()
 	{
-		ImGui::Begin("Hot reload");
-
-
 		std::string load_header = "Load DLL: ";
 		std::string release_header = "Release DLL: ";
-		std::string name = typeid(T).name();
+		std::string name = typeid(DLL).name();
 		replace(name, "struct ", "");
 
 		std::string load_text = load_header + name;
 		std::string release_text = release_header + name;
 
-		if (!initialised)
+		if (!DLL::loaded)
 		{
 			if (ImGui::Button(load_text.c_str()))
 			{
-				T::load_dll();
-				initialised = true;
+				DLL::load_dll();
 			}
 		}
 		else
 		{
-			T::tick(pool);
-
 			if (ImGui::Button(release_text.c_str()))
 			{
-				T::release_dll();
-				initialised = false;
+				DLL::release_dll();
 			}
 		}
 
-		ImGui::End();
+		if constexpr (sizeof ...(OTHERS) != 0)
+		{
+			draw_dll<OTHERS...>();
+		}
 	}
 
-private:
-	bool initialised;
+	void inline draw(peetcs::archetype_pool& pool) override
+	{
+		ImGui::Begin("Hot reload");
 
+		draw_dll<T...>();
+
+		ImGui::End();
+	}
 };

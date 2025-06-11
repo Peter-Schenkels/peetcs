@@ -33,6 +33,12 @@ int main()
 		std::vector<pipo::mesh_id> meshes;
 		pipo::resources::load_mesh_gpu(mesh_settings, meshes);
 
+		pipo::render_target::allocate_settings render_target_settings = {};
+		render_target_settings.width = 250;
+		render_target_settings.height = 250;
+
+		pipo::render_target_id main_render_target = pipo::resources::create_render_target(render_target_settings);
+
 		// Setup entities
 		peetcs::entity_id triangle = 1;
 		peetcs::entity_id camera = 0;
@@ -76,6 +82,7 @@ int main()
 				camera_data.fov = 60.0f;
 				camera_data.type = pipo::view_type::perspective;
 				camera_data.active = true;
+				camera_data.render_target = main_render_target;
 
 				pool.emplace_commands();
 			}

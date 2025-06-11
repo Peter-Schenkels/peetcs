@@ -9,7 +9,7 @@
 void tick_api(peetcs::archetype_pool& c_pool)
 {
 	peetcs::archetype_pool& pool = c_pool;
-	auto query = pool.query<pipo::transform_data, pipo::mesh_render_data, pipo::unlit_material_data>();
+	auto query = pool.query<pipo::transform_data, pipo::mesh_renderer_data, pipo::unlit_material_data>();
 
 	for (auto query_value : query)
 	{

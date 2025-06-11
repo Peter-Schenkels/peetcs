@@ -101,7 +101,7 @@ public:
 		void set_rotation(float pitch, float yaw, float roll);
 	};
 
-	struct mesh_render_data
+	struct mesh_renderer_data
 	{
 		constexpr static uint16_t id = 0;
 
@@ -109,12 +109,16 @@ public:
 		bool visible;
 	};
 
-	struct render_texture_data
+	struct render_target_renderer_data
 	{
 		constexpr static uint16_t id = 3;
 
-		render_target_id render_target;
-		texture_id texture;
+		int x;
+		int y;
+		int height;
+		int width;
+		render_target_id target_id;
+		bool visible;
 	};
 
 	struct lit_material_data
@@ -246,7 +250,6 @@ public:
 		int height;
 	};
 
-
 	/// <summary>
 	/// Resources that are allocated on the GPU
 	/// </summary>
@@ -291,10 +294,6 @@ public:
 
 	// Adds a camera data and transform data to an entity and more
 	static bool create_camera_entity(const peetcs::entity_id entity);
-
-	static void render_camera(const camera_data& camera, const render_texture_data& target_texture);
-
-	static void render_texture_to_window(const glfw_window_data& window, const render_texture_data& target_texture);
 
 	static bool bind_render_target(const render_target_id id);
 	static void unbind_render_target();

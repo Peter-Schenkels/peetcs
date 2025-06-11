@@ -26,7 +26,7 @@
 	}\
 	loaded = true;
 #else
-#define API_LOAD_DLL()\
+#define API_LOAD_DLL(dllName)\
 	dll = LoadLibrary(#dllName".dll");\
 	if (!dll) {\
 		std::cerr << #dllName " - Failed to load DLL!" << std::endl;\

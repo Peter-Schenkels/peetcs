@@ -227,15 +227,6 @@ bool pipo::create_camera_entity(const peetcs::entity_id entity)
     return false;
 }
 
-void pipo::render_camera(const camera_data& camera, const render_texture_data& target_texture)
-{
-    
-}
-
-void pipo::render_texture_to_window(const glfw_window_data& window, const render_texture_data& target_texture)
-{
-}
-
 bool pipo::bind_render_target(const render_target_id id)
 {
     if (auto result = resources::render_targets.find(id); result != resources::render_targets.end())
@@ -359,10 +350,10 @@ void pipo::render_misc_material_meshes(peetcs::archetype_pool& pool)
         glm::mat4 projection = get_projection(camera);
         bool camera_uniforms_set = false;
 
-        auto query = pool.query<material_data, transform_data, mesh_render_data>();
+        auto query = pool.query<material_data, transform_data, mesh_renderer_data>();
         for (auto query_value : query)
         {
-            const auto& mesh_renderer = query_value.get<mesh_render_data>();
+            const auto& mesh_renderer = query_value.get<mesh_renderer_data>();
             if (!mesh_renderer.visible)
             {
 	            continue;
@@ -425,7 +416,7 @@ void pipo::render_unlit_material_meshes(peetcs::archetype_pool& pool)
         glm::mat4 projection = get_projection(camera);
         bool camera_uniforms_set = false;
 
-        auto query = pool.query<unlit_material_data, transform_data, mesh_render_data>();
+        auto query = pool.query<unlit_material_data, transform_data, mesh_renderer_data>();
 
         GL_CALL(glUseProgram(unlit_material_data::program));
         int loc_model = glGetUniformLocation(unlit_material_data::program, "model");
@@ -436,7 +427,7 @@ void pipo::render_unlit_material_meshes(peetcs::archetype_pool& pool)
 
         for (auto query_value : query)
         {
-            const auto& mesh_renderer = query_value.get<mesh_render_data>();
+            const auto& mesh_renderer = query_value.get<mesh_renderer_data>();
             if (!mesh_renderer.visible)
             {
                 continue;
@@ -478,18 +469,25 @@ void pipo::render_frame(peetcs::archetype_pool& pool)
 
     GL_CALL(glBindVertexArray(resources::quad_mesh.vertex_array_object));
     GL_CALL(glUseProgram(pipo::resources::render_texture_shader));
-    for (auto& render_target : resources::render_targets)
+
+    
+
+    auto render_target_query = pool.query<pipo::render_target_renderer_data>();
+    for (auto render_target_value : render_target_query)
     {
+        render_target_renderer_data& render_target_data = render_target_value.get<render_target_renderer_data>();
+        GL_CALL(glViewport(render_target_data.x, render_target_data.y, render_target_data.width, render_target_data.height));
+
         int loc_main_texture = glGetUniformLocation(unlit_material_data::program, "renderedTexture");
         GL_CALL(glUniform1i(loc_main_texture, 0));
 
         GL_CALL(glActiveTexture(GL_TEXTURE0));
-        GL_CALL(glBindTexture(GL_TEXTURE_2D, render_target.second.id.render_texture_id));
+        GL_CALL(glBindTexture(GL_TEXTURE_2D, render_target_data.target_id.render_texture_id));
 
         glDrawElements(GL_TRIANGLES, resources::quad_mesh.nb_of_indices, GL_UNSIGNED_INT, 0);
         GL_CALL(glBindVertexArray(0));
     }
-
+    GL_CALL(glViewport(0, 0, resources::width, resources::height));
 
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

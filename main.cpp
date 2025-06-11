@@ -34,16 +34,30 @@ int main()
 		pipo::resources::load_mesh_gpu(mesh_settings, meshes);
 
 		pipo::render_target::allocate_settings render_target_settings = {};
-		render_target_settings.width = 250;
-		render_target_settings.height = 250;
+		render_target_settings.width = 250.f * (1920.f / 1080);
+		render_target_settings.height = 250.f;
 
 		pipo::render_target_id main_render_target = pipo::resources::create_render_target(render_target_settings);
+
+		peetcs::entity_id render_target = 2;
+		{
+			pipo::render_target_renderer_data& target_renderer = pool.add<pipo::render_target_renderer_data>(render_target);
+			target_renderer.width = 250;
+			target_renderer.height = 250;
+			target_renderer.x = 500;
+			target_renderer.y = 400;
+			target_renderer.target_id = main_render_target;
+			target_renderer.visible = true;
+
+			pool.emplace_commands();
+		}
 
 		// Setup entities
 		peetcs::entity_id triangle = 1;
 		peetcs::entity_id camera = 0;
+
 		{
-			int amount = 100;
+			int amount = 1000;
 
 			// Setup car entities
 			for (int i = 0; i < amount; i++)
@@ -53,7 +67,7 @@ int main()
 				int x = i % (int)sqrt(amount) - sqrt(amount) / 2;
 				int y = i / (int)sqrt(amount) - sqrt(amount) / 2;
 
-				pipo::mesh_render_data& mesh_render = pool.add<pipo::mesh_render_data>(triangle);
+				pipo::mesh_renderer_data& mesh_render = pool.add<pipo::mesh_renderer_data>(triangle);
 				mesh_render.mesh_id = meshes.front();
 				mesh_render.visible = i % 1 == 0;
 
@@ -107,15 +121,23 @@ int main()
 			pipo::transform_data& camera_transform = camera_value.get<pipo::transform_data>();
 			camera_transform.position[0] += 0.001f;
 			camera_transform.position[1] += 0.001f;
-			camera_transform.position[2] += 0.0010f;
+			camera_transform.position[2] += 0.010f;
 			camera_transform.rotation[2] -= 0.001f;
 		}
 
-		auto mesh_query = pool.query<pipo::mesh_render_data, pipo::transform_data>();
+		auto mesh_query = pool.query<pipo::mesh_renderer_data, pipo::transform_data>();
 		for (auto query : mesh_query)
 		{
 			pipo::transform_data& transform = query.get<pipo::transform_data>();
 			transform.rotation[2] += 0.1f;
+		}
+
+		auto render_target_query = pool.query<pipo::render_target_renderer_data>();
+		for (auto query : render_target_query)
+		{
+			pipo::render_target_renderer_data& render_target = query.get<pipo::render_target_renderer_data>();
+			render_target.x += 1;
+			render_target.width += 2;
 		}
 
 		if (phesycs::loaded)

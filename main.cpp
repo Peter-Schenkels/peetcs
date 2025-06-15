@@ -34,18 +34,18 @@ int main()
 		pipo::resources::load_mesh_gpu(mesh_settings, meshes);
 
 		pipo::render_target::allocate_settings render_target_settings = {};
-		render_target_settings.width = 250.f * (1920.f / 1080);
-		render_target_settings.height = 250.f;
+		render_target_settings.width = pipo::resources::width;
+		render_target_settings.height = pipo::resources::height;
 
 		pipo::render_target_id main_render_target = pipo::resources::create_render_target(render_target_settings);
 
-		peetcs::entity_id render_target = 2;
+		peetcs::entity_id render_target = 0;
 		{
 			pipo::render_target_renderer_data& target_renderer = pool.add<pipo::render_target_renderer_data>(render_target);
-			target_renderer.width = 250;
-			target_renderer.height = 250;
-			target_renderer.x = 500;
-			target_renderer.y = 400;
+			target_renderer.width = pipo::resources::width;
+			target_renderer.height = pipo::resources::height;
+			target_renderer.x = 0;
+			target_renderer.y = 0;
 			target_renderer.target_id = main_render_target;
 			target_renderer.visible = true;
 
@@ -53,14 +53,14 @@ int main()
 		}
 
 		// Setup entities
-		peetcs::entity_id triangle = 1;
-		peetcs::entity_id camera = 0;
+		peetcs::entity_id triangle = 2;
+		peetcs::entity_id camera = 1;
 
 		{
-			int amount = 1000;
+			int amount = 500;
 
 			// Setup car entities
-			for (int i = 0; i < amount; i++)
+			for (int i = triangle; i < amount; i++)
 			{
 				triangle = i + 1;
 
@@ -78,6 +78,7 @@ int main()
 				triangle_transform.set_pos(x, y, 0);
 				triangle_transform.set_rotation(x, y, 0);
 				triangle_transform.set_scale(0.1f, 0.1f, 0.1f);
+
 
 				pool.emplace_commands();
 			}
@@ -109,6 +110,8 @@ int main()
 		std::make_unique<dll_reloader<phesycs>>()
 	};
 
+
+
 	// Do game ticks
 	while (pipo::start_frame())
 	{
@@ -125,20 +128,24 @@ int main()
 			camera_transform.rotation[2] -= 0.001f;
 		}
 
+
+		float lastpos[3] = { 0, 0, 0 };
+		int i = 0;
+
 		auto mesh_query = pool.query<pipo::mesh_renderer_data, pipo::transform_data>();
 		for (auto query : mesh_query)
 		{
+			i++;
 			pipo::transform_data& transform = query.get<pipo::transform_data>();
 			transform.rotation[2] += 0.1f;
+
+			//pipo::debug::draw_line(glm::vec3{ lastpos[0], lastpos[1], lastpos[2] }, transform.get_pos(), { 1, 0, 0 });
+			lastpos[0] = transform.position[0];
+			lastpos[1] = transform.position[1];
+			lastpos[2] = transform.position[2];
 		}
 
-		auto render_target_query = pool.query<pipo::render_target_renderer_data>();
-		for (auto query : render_target_query)
-		{
-			pipo::render_target_renderer_data& render_target = query.get<pipo::render_target_renderer_data>();
-			render_target.x += 1;
-			render_target.width += 2;
-		}
+		std::cout << i << std::endl;;
 
 		if (phesycs::loaded)
 		{

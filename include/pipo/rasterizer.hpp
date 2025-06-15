@@ -188,6 +188,7 @@ public:
 			vertex_2d_normal,
 			vertex_3d,
 			vertex_3d_normal,
+			debug,
 		};
 
 		struct load_settings
@@ -250,6 +251,31 @@ public:
 		int height;
 	};
 
+
+	struct debug
+	{
+		static void draw_line(glm::vec3 a, glm::vec3 b, glm::vec3 color);
+		static void draw_sphere(glm::vec3 position, float radius, glm::vec3 color);
+		static void draw_cube(glm::vec3 position, glm::vec3 scale, glm::quat rotation, glm::vec3 color);
+
+		static void render_draw_calls(const camera_data& camera, const transform_data& camera_transform);
+		static void clear_draw_calls();
+
+		friend pipo;
+
+	private:
+		struct debug_draw_call
+		{
+			glm::vec3 color;
+			std::vector<glm::vec4> vertices;
+			std::vector<int> indices;
+		};
+
+		static std::vector<debug_draw_call> queued_draw_calls;
+		static shader_id debug_shader_id;
+	};
+
+
 	/// <summary>
 	/// Resources that are allocated on the GPU
 	/// </summary>
@@ -267,8 +293,6 @@ public:
 		static shader_id create_shader_gpu(const shader::allocate_settings& settings);
 
 		static render_target_id create_render_target(const render_target::allocate_settings& settings);
-
-		static void create_mesh_primitives();
 		static void init_default_resources();
 
 		static std::unordered_map<texture_id, texture>                textures;
@@ -281,6 +305,7 @@ public:
 
 		static mesh_id quad_mesh;
 		static shader_id render_texture_shader;
+
 	};
 
 	static bool init();
@@ -292,19 +317,73 @@ public:
 	// Create a glfw window and data representation and adds it to an entity
 	static bool set_window_size(int width, int height);
 
-	// Adds a camera data and transform data to an entity and more
-	static bool create_camera_entity(const peetcs::entity_id entity);
-
 	static bool bind_render_target(const render_target_id id);
 	static void unbind_render_target();
 
 	static void render_imgui(peetcs::archetype_pool& pool, std::vector<std::shared_ptr<gui_interface>> guis);
 	static bool start_frame();
+
 	static void render_frame(peetcs::archetype_pool& pool);
 
+	struct primitives
+	{
+		struct cube
+		{
+			static inline glm::vec3 s_axes[] =
+			{
+				glm::vec3{1.f, 0.f, 0.f}, // X-axis
+				glm::vec3{0.f, 1.f, 0.f}, // Y-axis
+				glm::vec3{0.f, 0.f, 1.f},  // Z-axis
+				glm::vec3{-1.f, 0.f, 0.f}, // X-axis
+				glm::vec3{0.f, -1.f, 0.f}, // Y-axis
+				glm::vec3{0.f, 0.f, -1.f}  // Z-axis
+			};
+
+			static inline std::vector<unsigned int> indices{
+				//Top
+				2, 6, 7,
+				2, 3, 7,
+
+				//Bottom
+				0, 4, 5,
+				0, 1, 5,
+
+				//Left
+				0, 2, 6,
+				0, 4, 6,
+
+				//Right
+				1, 3, 7,
+				1, 5, 7,
+
+				//Front
+				0, 2, 3,
+				0, 1, 3,
+
+				//Back
+				4, 6, 7,
+				4, 5, 7
+			};
+
+			static inline std::vector<glm::vec3> vertices{
+			{	-1, -1,  1, },
+			{	 1, -1,  1, },
+			{	-1,  1,  1, },
+			{	 1,  1,  1, },
+			{	-1, -1, -1, },
+			{	 1, -1, -1, },
+			{	-1,  1, -1, },
+			{	 1,  1, -1, },
+			};
+		};
+	};
+
 private:
-	static void render_misc_material_meshes(peetcs::archetype_pool& pool);
-	static void render_unlit_material_meshes(peetcs::archetype_pool& pool);
+	static void render_meshes(peetcs::archetype_pool& pool);
+	static void render_unlit_material_meshes(peetcs::archetype_pool& pool, const camera_data& camera,
+	                                         const transform_data& camera_transform);
+	static void render_misc_material_meshes(peetcs::archetype_pool& pool, const camera_data& camera,
+		const transform_data& camera_transform);
 };
 
 

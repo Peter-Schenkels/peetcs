@@ -92,6 +92,8 @@ public:
 		float scale[3] = { 0, 0, 0 };
 		float rotation[3] = { 0, 0, 0 };
 
+		peetcs::entity_id parent = std::numeric_limits<peetcs::entity_id>::max();
+
 		glm::vec3 get_pos() const;
 		glm::vec3 get_scale() const;
 		glm::quat get_rotation() const;
@@ -99,6 +101,9 @@ public:
 		void set_pos(float x, float y, float z);
 		void set_scale(float x, float y, float z);
 		void set_rotation(float pitch, float yaw, float roll);
+
+		glm::mat4 get_local_space() const;
+		glm::mat4 get_world_space(peetcs::archetype_pool& pool) const;
 	};
 
 	struct mesh_renderer_data
@@ -268,7 +273,9 @@ public:
 		{
 			glm::vec3 color;
 			std::vector<glm::vec4> vertices;
-			std::vector<int> indices;
+			std::vector<unsigned int> indices;
+
+			glm::mat4 model_matrix;
 		};
 
 		static std::vector<debug_draw_call> queued_draw_calls;
@@ -422,6 +429,7 @@ inline glm::vec3 pipo::transform_data::get_pos() const
 {
 	return glm::vec3(position[0], position[1], position[2]);
 }
+
 
 template <>
 struct std::hash<pipo::mesh_id>

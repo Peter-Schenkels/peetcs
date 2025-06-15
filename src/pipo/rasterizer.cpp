@@ -374,7 +374,7 @@ void pipo::render_misc_material_meshes(peetcs::archetype_pool& pool, const pipo:
 		}
 
 		const transform_data& transform = query_value.get<transform_data>();
-		glm::mat4 model = get_model(transform);
+        glm::mat4 model = transform.get_world_space(pool);
 		GL_CALL(glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm::value_ptr(model)));
 
 
@@ -421,7 +421,7 @@ void pipo::render_unlit_material_meshes(peetcs::archetype_pool& pool, const pipo
 
 
 		const transform_data& transform = query_value.get<transform_data>();
-		glm::mat4 model = get_model(transform);
+		glm::mat4 model = transform.get_world_space(pool);
 		GL_CALL(glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm::value_ptr(model)));
 
 
@@ -521,14 +521,62 @@ bool pipo::render_target_id::operator==(const render_target_id& other) const
         other.render_texture_id == render_texture_id;
 }
 
-void pipo::debug::draw_line(glm::vec3 a, glm::vec3 b, glm::vec3 color)
+glm::mat4 pipo::transform_data::get_local_space() const
+{
+    return get_model(*this);
+}
+
+glm::mat4 pipo::transform_data::get_world_space(peetcs::archetype_pool& pool) const
+{
+    if (parent == std::numeric_limits<peetcs::entity_id>::max())
+    {
+        return get_local_space();
+    }
+
+    transform_data* parent_transform = pool.get_from_owner<transform_data>(parent);
+    if (!parent_transform) // safety check
+    {
+        return get_local_space(); // fallback: act as root if parent is invalid
+    }
+
+    glm::mat4 parent_ws_matrix = parent_transform->get_world_space(pool);
+
+    return parent_ws_matrix * get_local_space();
+}
+
+
+void pipo::debug::draw_line(const glm::vec3 a, const glm::vec3 b, const glm::vec3 color)
 {
     debug_draw_call draw_call = {};
 
     draw_call.color = color;
     draw_call.vertices = { glm::vec4(a, 1.0f), glm::vec4(b, 1.0f)};
     draw_call.indices = { 0, 1, 0 };
+    draw_call.model_matrix = glm::mat4(1.0);
 
+    debug::queued_draw_calls.push_back(draw_call);
+}
+
+void pipo::debug::draw_cube(glm::vec3 position, glm::vec3 scale, glm::quat rotation, glm::vec3 color)
+{
+    debug_draw_call draw_call = {};
+
+    draw_call.color = color;
+
+    transform_data transform = {};
+    transform.set_pos(position.x, position.y, position.z);
+    glm::vec3 euler_rotation = glm::eulerAngles(rotation);
+    transform.set_rotation(euler_rotation.x, euler_rotation.y, euler_rotation.z);
+    transform.set_scale(scale.x, scale.y, scale.z);
+    glm::mat4 model_matrix = get_model(transform);
+
+    draw_call.vertices.reserve(primitives::cube::vertices.size());
+    for (auto& vertex : primitives::cube::vertices)
+    {
+        draw_call.vertices.emplace_back(vertex, 1.0f);
+    }
+    draw_call.indices = primitives::cube::indices;
+    draw_call.model_matrix = model_matrix;
     debug::queued_draw_calls.push_back(draw_call);
 }
 
@@ -550,7 +598,7 @@ void pipo::debug::render_draw_calls(const camera_data& camera, const transform_d
         // Transform vertex to camera space
 		for (auto& vertex : queued_draw_call.vertices)
 		{
-            vertex = projection * view * vertex;
+            vertex = projection * view * queued_draw_call.model_matrix * vertex;
 		}
 
         mesh::allocate_settings settings;

@@ -57,8 +57,8 @@ int main()
 		peetcs::entity_id camera = 1;
 
 		{
-			int amount = 500;
-
+			int amount = 10;
+			peetcs::entity_id last_entity = 0;
 			// Setup car entities
 			for (int i = triangle; i < amount; i++)
 			{
@@ -77,8 +77,19 @@ int main()
 				pipo::transform_data& triangle_transform = pool.add<pipo::transform_data>(triangle);
 				triangle_transform.set_pos(x, y, 0);
 				triangle_transform.set_rotation(x, y, 0);
-				triangle_transform.set_scale(0.1f, 0.1f, 0.1f);
 
+				triangle_transform.set_scale(1.f, 1.f, 1.f);
+
+				if (last_entity != 0 )
+				{
+					triangle_transform.parent = last_entity;
+				}
+				else
+				{
+					triangle_transform.set_scale(0.1f, 0.1f, 0.1f);
+				}
+
+				last_entity = triangle;
 
 				pool.emplace_commands();
 			}
@@ -135,17 +146,24 @@ int main()
 		auto mesh_query = pool.query<pipo::mesh_renderer_data, pipo::transform_data>();
 		for (auto query : mesh_query)
 		{
+		
 			i++;
 			pipo::transform_data& transform = query.get<pipo::transform_data>();
-			transform.rotation[2] += 0.1f;
 
-			//pipo::debug::draw_line(glm::vec3{ lastpos[0], lastpos[1], lastpos[2] }, transform.get_pos(), { 1, 0, 0 });
-			lastpos[0] = transform.position[0];
-			lastpos[1] = transform.position[1];
-			lastpos[2] = transform.position[2];
+
+			if (transform.parent == UINT32_MAX)
+			{
+				//transform.rotation[2] += 0.1f;
+				transform.rotation[1] += 0.1f;
+				pipo::debug::draw_cube(transform.get_pos(), glm::vec3(0.3f), transform.get_rotation(), glm::vec3(1, 0, 0));
+
+				lastpos[0] = transform.position[0];
+				lastpos[1] = transform.position[1];
+				lastpos[2] = transform.position[2];
+			}
+
+
 		}
-
-		std::cout << i << std::endl;;
 
 		if (phesycs::loaded)
 		{

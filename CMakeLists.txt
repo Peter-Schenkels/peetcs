@@ -121,7 +121,7 @@ include_directories(external/glm external/stb external/obj_loader external/imgui
 # Add path to GLEW libraries
 link_directories(${CMAKE_SOURCE_DIR}/external/glew/lib/Release/x64)
 
-set(SRC_LIB_PIPO_RASTERIZER ${SRC_INCLUDE} ${SRC_INCLUDE_PIPO_RASTERIZER} ${SRC_SRC_PIPO} ${SRC_SRC} ${SRC_TESTS})
+set(SRC_LIB_PIPO_RASTERIZER ${SRC_INCLUDE_PIPO_RASTERIZER} ${SRC_SRC_PIPO})
 
 # define the target
 add_project(PIPO
@@ -136,21 +136,21 @@ target_include_directories(PIPO PRIVATE external/glm external/stb external/obj_l
 source_group("Main" FILES ${SRC_MAIN})
 
 
-
-
 # FILE GROUP SRC_TESTS
-set(SRC_SHARED
+set(SRC_PHESYCS
     "include/dll_macros.hpp"
 	"tests/shared.hpp"
-	"src/shared.cpp"
+	"src/phesycs/shared.cpp"
+	"src/phesycs/phesycs.cpp"
+	"include/phesycs/phesycs.hpp"
 )
 
-source_group("Shared" FILES ${SRC_SHARED})
+source_group("Phesycs" FILES ${SRC_PHESYCS})
 
 # define the target
 add_project(PHESYCS
             SHARED_LIB
-            SOURCES ${SRC_SHARED}
+            SOURCES ${SRC_PHESYCS}
             DEPENDS PEETCS PIPO)
 
 # define the target

@@ -11,6 +11,10 @@ namespace peetcs
 	using component_id   = element_layout::index_t;
 	using component_type = element_layout::hash_t;
 
+	constexpr entity_id invalid_entity_id = std::numeric_limits<entity_id>::max();
+	constexpr entity_id invalid_component_id = std::numeric_limits<component_id>::max();
+
+
 	struct add_component_command
 	{
 		entity_id      target;
@@ -36,6 +40,8 @@ namespace peetcs
 		std::unordered_map<entity_id, std::unordered_map<component_type, generic_container>> list_blocks;
 
 		std::size_t default_array_size = 10000;
+
+
 
 		archetype_pool()
 		{

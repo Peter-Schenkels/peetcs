@@ -23,7 +23,10 @@
 #include <iostream>
 #include <sstream>
 
-std::unordered_map<pipo::texture_id, pipo::texture>               pipo::resources::textures = {};
+
+pipo::shader_id pipo::unlit_material_data::program = {};
+
+/*std::unordered_map<pipo::texture_id, pipo::texture>               pipo::resources::textures = {};
 std::unordered_map<pipo::mesh_id, pipo::mesh>                     pipo::resources::meshes = {};
 std::unordered_map<pipo::shader_id, pipo::shader>                 pipo::resources::shaders = {};
 std::unordered_map<pipo::render_target_id, pipo::render_target>   pipo::resources::render_targets = {};
@@ -34,7 +37,7 @@ pipo::shader_id pipo::unlit_material_data::program = -1;
 pipo::mesh_id pipo::resources::quad_mesh = {};
 pipo::shader_id pipo::resources::render_texture_shader = -1;
 
-std::vector<pipo::debug::debug_draw_call> pipo::debug::queued_draw_calls = {};
+std::vector<pipo::debug::debug_draw_call> pipo::debug::queued_draw_calls = {};*/
 pipo::shader_id pipo::debug::debug_shader_id = -1;
 
 
@@ -122,7 +125,22 @@ void main(){
 )";
 
 
-void pipo::resources::init_default_resources()
+bool pipo::mesh_id::operator==(const mesh_id& other) const
+{
+    return element_buffer_object == other.element_buffer_object &&
+        vertex_array_object == other.vertex_array_object &&
+        vertex_buffer_object == other.vertex_buffer_object;
+}
+
+bool pipo::render_target_id::operator==(const render_target_id& other) const
+{
+    return other.depth_buffer_id == depth_buffer_id &&
+        other.frame_buffer_id == frame_buffer_id &&
+        other.render_texture_id == render_texture_id;
+}
+
+
+void pipo::init_default_resources()
 {
     stbi_set_flip_vertically_on_load(true);
 
@@ -131,7 +149,7 @@ void pipo::resources::init_default_resources()
         pipo::shader::allocate_settings shader_settings = {};
         shader_settings.vertex_shader_code = vertex_shader_unlit_code;
         shader_settings.fragment_shader_code = fragment_shader_unlit_code;
-        pipo::unlit_material_data::program = pipo::resources::create_shader_gpu(shader_settings);
+        pipo::unlit_material_data::program = pipo::create_shader_gpu(shader_settings);
     }
 
     // Create render texture display shader
@@ -139,7 +157,7 @@ void pipo::resources::init_default_resources()
         pipo::shader::allocate_settings shader_settings = {};
         shader_settings.vertex_shader_code = vertex_shader_render_texture;
         shader_settings.fragment_shader_code = fragment_shader_render_texture;
-        pipo::resources::render_texture_shader = pipo::resources::create_shader_gpu(shader_settings);
+		_resources.render_texture_shader = pipo::create_shader_gpu(shader_settings);
     }
 
     // Compile debug shader
@@ -147,7 +165,7 @@ void pipo::resources::init_default_resources()
         pipo::shader::allocate_settings shader_settings = {};
         shader_settings.vertex_shader_code = vertex_shader_debug;
         shader_settings.fragment_shader_code = fragment_shader_debug;
-        pipo::debug::debug_shader_id = pipo::resources::create_shader_gpu(shader_settings);
+		debug::debug_shader_id = pipo::create_shader_gpu(shader_settings);
     }
 
     {
@@ -174,7 +192,7 @@ void pipo::resources::init_default_resources()
         settings.nb_of_indices = 6;
         settings.nb_of_vertices = 4;
 
-        quad_mesh = resources::allocate_mesh_gpu(settings);
+        _resources.quad_mesh = allocate_mesh_gpu(settings);
     }
 
     // Set GL render state
@@ -188,9 +206,9 @@ void pipo::resources::init_default_resources()
 
 bool pipo::init()
 {
-    resources::textures = {};
-    resources::meshes = {};
-    resources::shaders = {};
+    _resources.textures = {};
+    _resources.meshes = {};
+    _resources.shaders = {};
 
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW\n";
@@ -203,23 +221,23 @@ bool pipo::init()
 
 void pipo::deinit()
 {
-    glfwDestroyWindow((GLFWwindow*)pipo::resources::window);
+    glfwDestroyWindow((GLFWwindow*)_resources.window);
     glfwTerminate();
 }
 
 bool pipo::create_window(int width, int height, const char* title)
 {
-    resources::window = glfwCreateWindow(width, height, title, nullptr, nullptr);
-    if (!resources::window) {
+    _resources.window = glfwCreateWindow(width, height, title, nullptr, nullptr);
+    if (!_resources.window) {
         std::cerr << "Failed to create GLFW window\n";
         glfwTerminate();
         return false;
     }
 
-    resources::width = width;
-    resources::height = height;
+    _resources.width = width;
+    _resources.height = height;
 
-    glfwMakeContextCurrent((GLFWwindow*)resources::window);
+    glfwMakeContextCurrent((GLFWwindow*)_resources.window);
 
     if (glewInit() != GLEW_OK) {      // ✅ Loads OpenGL function pointers
         std::cerr << "GLEW init failed\n";
@@ -233,27 +251,29 @@ bool pipo::create_window(int width, int height, const char* title)
     ImGui::StyleColorsDark(); // or ImGui::StyleColorsClassic();
 
     // Setup ImGui backends
-    ImGui_ImplGlfw_InitForOpenGL((GLFWwindow*)resources::window, true);
+    ImGui_ImplGlfw_InitForOpenGL((GLFWwindow*)_resources.window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
+
+    glfwSwapInterval(0);
 
     return true;
 }
 
 bool pipo::set_window_size(int width, int height)
 {
-    resources::width = width;
-    resources::height = height;
+    _resources.width = width;
+    _resources.height = height;
 
-    glfwSetWindowSize((GLFWwindow*)resources::window, width, height);
+    glfwSetWindowSize((GLFWwindow*)_resources.window, width, height);
 
     return false;
 }
 
 bool pipo::bind_render_target(const render_target_id id)
 {
-    if (auto result = resources::render_targets.find(id); result != resources::render_targets.end())
+    if (auto result = std::find_if(_resources.render_targets.begin(), _resources.render_targets.end(), [id] (auto& a){ return a.id == id;}); result != _resources.render_targets.end())
     {
-        const render_target& render_target_to_bind = result->second;
+        const render_target& render_target_to_bind = *result;
         GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, render_target_to_bind.id.frame_buffer_id));
         GL_CALL(glViewport(0, 0, render_target_to_bind.width, render_target_to_bind.height));
 
@@ -266,7 +286,7 @@ bool pipo::bind_render_target(const render_target_id id)
 void pipo::unbind_render_target()
 {
     GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-    GL_CALL(glViewport(0, 0, resources::width, resources::height));
+    GL_CALL(glViewport(0, 0, _resources.width, _resources.height));
 }
 
 glm::mat4 get_view(const pipo::transform_data& transform)
@@ -330,10 +350,10 @@ void pipo::render_imgui(peetcs::archetype_pool& pool, std::vector<std::shared_pt
 
 bool pipo::start_frame()
 {
-    glfwSwapBuffers((GLFWwindow*)pipo::resources::window);
+    glfwSwapBuffers((GLFWwindow*)_resources.window);
     glfwPollEvents();
 
-    if (!glfwWindowShouldClose((GLFWwindow*)pipo::resources::window))
+    if (!glfwWindowShouldClose((GLFWwindow*)_resources.window))
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -459,10 +479,10 @@ void pipo::render_meshes(peetcs::archetype_pool& pool)
 
         render_misc_material_meshes(pool, camera, camera_transform);
         render_unlit_material_meshes(pool, camera, camera_transform);
-        debug::render_draw_calls(camera, camera_transform);
+        render_debug_draw_calls(camera, camera_transform);
     }
 
-    debug::clear_draw_calls();
+    _debug.clear_draw_calls();
     pipo::unbind_render_target();
 }
 
@@ -471,8 +491,8 @@ void pipo::render_frame(peetcs::archetype_pool& pool)
     render_meshes(pool);
 
     // Render textures to screen
-    GL_CALL(glBindVertexArray(resources::quad_mesh.vertex_array_object));
-    GL_CALL(glUseProgram(pipo::resources::render_texture_shader));
+    GL_CALL(glBindVertexArray(_resources.quad_mesh.vertex_array_object));
+    GL_CALL(glUseProgram(_resources.render_texture_shader));
 
     auto render_target_query = pool.query<pipo::render_target_renderer_data>();
     for (auto render_target_value : render_target_query)
@@ -486,39 +506,20 @@ void pipo::render_frame(peetcs::archetype_pool& pool)
         GL_CALL(glActiveTexture(GL_TEXTURE0));
         GL_CALL(glBindTexture(GL_TEXTURE_2D, render_target_data.target_id.render_texture_id));
 
-        glDrawElements(GL_TRIANGLES, resources::quad_mesh.nb_of_indices, GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, _resources.quad_mesh.nb_of_indices, GL_UNSIGNED_INT, 0);
         GL_CALL(glBindVertexArray(0));
     }
-    GL_CALL(glViewport(0, 0, resources::width, resources::height));
+    GL_CALL(glViewport(0, 0, _resources.width, _resources.height));
 
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-std::size_t std::hash<pipo::mesh_id>::operator()(const pipo::mesh_id& id) const noexcept
-{
-    return ((hash<unsigned int>()(id.element_buffer_object) ^ (hash<unsigned int>()(id.vertex_array_object) << 1)) >> 1)
-        ^ (hash<unsigned int>()(id.vertex_buffer_object) << 1);
-}
 
-std::size_t std::hash<pipo::render_target_id>::operator()(const pipo::render_target_id& id) const noexcept
+void pipo::transform_data::set_pos(glm::vec3 pos)
 {
-    return ((hash<unsigned int>()(id.depth_buffer_id) ^ (hash<unsigned int>()(id.frame_buffer_id) << 1)) >> 1)
-        ^ (hash<unsigned int>()(id.render_texture_id) << 1);
-}
-
-
-bool pipo::mesh_id::operator==(const mesh_id& other) const
-{
-    return element_buffer_object == other.element_buffer_object && 
-        vertex_array_object == other.vertex_array_object && 
-        vertex_buffer_object == other.vertex_buffer_object;
-}
-
-bool pipo::render_target_id::operator==(const render_target_id& other) const
-{
-    return other.depth_buffer_id == depth_buffer_id &&
-        other.frame_buffer_id == frame_buffer_id &&
-        other.render_texture_id == render_texture_id;
+    position[0] = pos.x;
+    position[1] = pos.y;
+    position[2] = pos.z;
 }
 
 glm::mat4 pipo::transform_data::get_local_space() const
@@ -545,21 +546,27 @@ glm::mat4 pipo::transform_data::get_world_space(peetcs::archetype_pool& pool) co
 }
 
 
-void pipo::debug::draw_line(const glm::vec3 a, const glm::vec3 b, const glm::vec3 color)
+void pipo::draw_line_gizmo(const glm::vec3 a, const glm::vec3 b, const glm::vec3 color)
 {
-    debug_draw_call draw_call = {};
+    debug::draw_call draw_call = {};
 
     draw_call.color = color;
     draw_call.vertices = { glm::vec4(a, 1.0f), glm::vec4(b, 1.0f)};
     draw_call.indices = { 0, 1, 0 };
     draw_call.model_matrix = glm::mat4(1.0);
 
-    debug::queued_draw_calls.push_back(draw_call);
+    _debug.queued_draw_calls.push_back(draw_call);
 }
 
-void pipo::debug::draw_cube(glm::vec3 position, glm::vec3 scale, glm::quat rotation, glm::vec3 color)
+
+void replace(void* calls)
 {
-    debug_draw_call draw_call = {};
+
+}
+
+void pipo::draw_cube_gizmo(glm::vec3 position, glm::vec3 scale, glm::quat rotation, glm::vec3 color)
+{
+    debug::draw_call draw_call = {};
 
     draw_call.color = color;
 
@@ -577,10 +584,10 @@ void pipo::debug::draw_cube(glm::vec3 position, glm::vec3 scale, glm::quat rotat
     }
     draw_call.indices = primitives::cube::indices;
     draw_call.model_matrix = model_matrix;
-    debug::queued_draw_calls.push_back(draw_call);
+    _debug.queued_draw_calls.push_back(draw_call);
 }
 
-void pipo::debug::render_draw_calls(const camera_data& camera, const transform_data& camera_transform)
+void pipo::render_debug_draw_calls(const camera_data& camera, const transform_data& camera_transform)
 {
     glm::mat4 view = get_view(camera_transform);
     glm::mat4 projection = get_projection(camera);
@@ -593,7 +600,7 @@ void pipo::debug::render_draw_calls(const camera_data& camera, const transform_d
     GL_CALL(glUseProgram(pipo::debug::debug_shader_id));
     int color_uniform = glGetUniformLocation(pipo::debug::debug_shader_id, "aColor");
 
-	for (auto& queued_draw_call : queued_draw_calls)
+	for (auto& queued_draw_call : _debug.queued_draw_calls)
 	{
         // Transform vertex to camera space
 		for (auto& vertex : queued_draw_call.vertices)
@@ -608,14 +615,14 @@ void pipo::debug::render_draw_calls(const camera_data& camera, const transform_d
         settings.nb_of_indices = queued_draw_call.indices.size();
         settings.nb_of_vertices = queued_draw_call.vertices.size();
 
-        mesh_id debug_mesh = resources::allocate_mesh_gpu(settings);
+        mesh_id debug_mesh = allocate_mesh_gpu(settings);
 
         GL_CALL(glUniform3f(color_uniform, queued_draw_call.color.r, queued_draw_call.color.g, queued_draw_call.color.b));
         GL_CALL(glBindVertexArray(debug_mesh.vertex_array_object));
         glDrawElements(GL_LINES, debug_mesh.nb_of_indices, GL_UNSIGNED_INT, 0);
         GL_CALL(glBindVertexArray(0));
 
-        resources::unload_mesh_gpu(debug_mesh);
+        unload_mesh_gpu(debug_mesh);
 	}
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -627,7 +634,7 @@ void pipo::debug::clear_draw_calls()
     queued_draw_calls.clear();
 }
 
-pipo::texture_id pipo::resources::load_texture_gpu(const texture::load_settings& settings)
+pipo::texture_id pipo::load_texture_gpu(const texture::load_settings& settings)
 {
     texture::allocate_settings allocate_settings = {};
     allocate_settings.generate_mipmaps = true;
@@ -646,7 +653,7 @@ pipo::texture_id pipo::resources::load_texture_gpu(const texture::load_settings&
     return id;
 }
 
-pipo::texture_id pipo::resources::allocate_texture_gpu(const texture::allocate_settings& settings)
+pipo::texture_id pipo::allocate_texture_gpu(const texture::allocate_settings& settings)
 {
     texture loaded_texture = {};
     glGenTextures(1, &loaded_texture.id);
@@ -699,23 +706,23 @@ pipo::texture_id pipo::resources::allocate_texture_gpu(const texture::allocate_s
         GL_CALL(glGenerateMipmap(GL_TEXTURE_2D));
     }
 
-    textures.try_emplace(loaded_texture.id, loaded_texture);
+    _resources.textures.try_emplace(loaded_texture.id, loaded_texture);
 
     return loaded_texture.id;
 }
 
-bool pipo::resources::unload_texture_gpu(const texture_id& id)
+bool pipo::unload_texture_gpu(const texture_id& id)
 {
-    if (textures.contains(id)) {
+    if (_resources.textures.contains(id)) {
         glDeleteTextures(1, &id);
-        textures.erase(id);
+        _resources.textures.erase(id);
         return true;
     }
 
     return false;
 }
 
-void pipo::resources::load_mesh_gpu(const mesh::load_settings& settings, std::vector<mesh_id>& loaded_meshes)
+void pipo::load_mesh_gpu(const mesh::load_settings& settings, std::vector<mesh_id>& loaded_meshes)
 {
     // TAKEN FROM EXAMPLES https://github.com/Bly7/OBJ-Loader/blob/master/examples/1%20-%20LoadAndPrint/e1_loadandprint.cpp
     
@@ -764,7 +771,7 @@ void pipo::resources::load_mesh_gpu(const mesh::load_settings& settings, std::ve
     std::cout << "ERROR: Failed to load OBJ File" << std::endl;;
 }
 
-pipo::mesh_id pipo::resources::allocate_mesh_gpu(const mesh::allocate_settings& settings)
+pipo::mesh_id pipo::allocate_mesh_gpu(const mesh::allocate_settings& settings)
 {
     mesh_id id = {};
 
@@ -892,22 +899,22 @@ pipo::mesh_id pipo::resources::allocate_mesh_gpu(const mesh::allocate_settings& 
     allocated_mesh.id = id;
     allocated_mesh.layout = settings.layout;
 
-    meshes.try_emplace(id, allocated_mesh);
+    _resources.meshes.push_back(allocated_mesh);
     return allocated_mesh.id;
 }
 
-bool pipo::resources::unload_mesh_gpu(const mesh_id& id)
+bool pipo::unload_mesh_gpu(const mesh_id& id)
 {
     GL_CALL(glDeleteVertexArrays(1, &id.vertex_array_object));
     GL_CALL(glDeleteBuffers(1, &id.element_buffer_object));
     GL_CALL(glDeleteBuffers(1, &id.vertex_buffer_object));
 
-    meshes.erase(id);
+    erase_if(_resources.meshes, [id](auto& a) { return a.id == id; });
 
     return true;
 }
 
-pipo::shader_id pipo::resources::load_shader_gpu(const shader::load_settings& settings)
+pipo::shader_id pipo::load_shader_gpu(const shader::load_settings& settings)
 {
     shader::allocate_settings allocate_settings = {};
 
@@ -925,7 +932,7 @@ pipo::shader_id pipo::resources::load_shader_gpu(const shader::load_settings& se
     return {};
 }
 
-pipo::shader_id pipo::resources::create_shader_gpu(const shader::allocate_settings& settings)
+pipo::shader_id pipo::create_shader_gpu(const shader::allocate_settings& settings)
 {
     shader compiled_shader = {};
 
@@ -989,7 +996,7 @@ pipo::shader_id pipo::resources::create_shader_gpu(const shader::allocate_settin
     return compiled_shader.id;
 }
 
-pipo::render_target_id pipo::resources::create_render_target(const render_target::allocate_settings& settings)
+pipo::render_target_id pipo::create_render_target(const render_target::allocate_settings& settings)
 {
     render_target_id render_target_id = {};
     glGenFramebuffers(1, &render_target_id.frame_buffer_id);
@@ -1022,7 +1029,7 @@ pipo::render_target_id pipo::resources::create_render_target(const render_target
         break;
     }
 
-    render_target_id.render_texture_id = pipo::resources::allocate_texture_gpu(texture_allocate_settings);
+    render_target_id.render_texture_id = pipo::allocate_texture_gpu(texture_allocate_settings);
 
     GL_CALL(glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, render_target_id.render_texture_id, 0));
 
@@ -1044,7 +1051,7 @@ pipo::render_target_id pipo::resources::create_render_target(const render_target
     // Set Frame buffer back to default frame buffer
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    render_targets.try_emplace(render_target_id, render_target_instanced);
+    _resources.render_targets.push_back(render_target_instanced);
 
     return render_target_id;
 }

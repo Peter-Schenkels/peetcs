@@ -1,6 +1,6 @@
 #pragma once
 
-
+#include <vector>
 
 #include <glm/vec3.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -89,7 +89,7 @@ public:
 		constexpr static uint16_t id = 1;
 
 		float position[3] = {0, 0, 0};
-		float scale[3] = { 0, 0, 0 };
+		float scale[3] = { 1, 1, 1 };
 		float rotation[3] = { 0, 0, 0 };
 
 		peetcs::entity_id parent = std::numeric_limits<peetcs::entity_id>::max();
@@ -99,6 +99,7 @@ public:
 		glm::quat get_rotation() const;
 
 		void set_pos(float x, float y, float z);
+		void set_pos(glm::vec3 pos);
 		void set_scale(float x, float y, float z);
 		void set_rotation(float pitch, float yaw, float roll);
 
@@ -259,17 +260,12 @@ public:
 
 	struct debug
 	{
-		static void draw_line(glm::vec3 a, glm::vec3 b, glm::vec3 color);
-		static void draw_sphere(glm::vec3 position, float radius, glm::vec3 color);
-		static void draw_cube(glm::vec3 position, glm::vec3 scale, glm::quat rotation, glm::vec3 color);
-
-		static void render_draw_calls(const camera_data& camera, const transform_data& camera_transform);
-		static void clear_draw_calls();
+		void clear_draw_calls();
 
 		friend pipo;
 
 	private:
-		struct debug_draw_call
+		struct draw_call
 		{
 			glm::vec3 color;
 			std::vector<glm::vec4> vertices;
@@ -278,59 +274,65 @@ public:
 			glm::mat4 model_matrix;
 		};
 
-		static std::vector<debug_draw_call> queued_draw_calls;
+		std::vector<draw_call> queued_draw_calls;
 		static shader_id debug_shader_id;
 	};
-
 
 	/// <summary>
 	/// Resources that are allocated on the GPU
 	/// </summary>
 	struct resources
 	{
-		static texture_id load_texture_gpu(const texture::load_settings& settings);
-		static texture_id allocate_texture_gpu(const texture::allocate_settings& settings);
-		static bool       unload_texture_gpu(const texture_id& id);
+		std::unordered_map<texture_id, texture>                textures;
+		std::vector<mesh>                   meshes;
+		std::unordered_map<shader_id,  shader>                 shaders;
+		std::vector<render_target>   render_targets;
+		void* window;
+		int width;
+		int height;
 
-		static void load_mesh_gpu(const mesh::load_settings& settings, std::vector<mesh_id>& loaded_meshes);
-		static mesh_id allocate_mesh_gpu(const mesh::allocate_settings& settings);
-		static bool    unload_mesh_gpu(const mesh_id& id);
-
-		static shader_id load_shader_gpu(const shader::load_settings& settings);
-		static shader_id create_shader_gpu(const shader::allocate_settings& settings);
-
-		static render_target_id create_render_target(const render_target::allocate_settings& settings);
-		static void init_default_resources();
-
-		static std::unordered_map<texture_id, texture>                textures;
-		static std::unordered_map<mesh_id,    mesh>                   meshes;
-		static std::unordered_map<shader_id,  shader>                 shaders;
-		static std::unordered_map<render_target_id,  render_target>   render_targets;
-		static void* window;
-		static int width;
-		static int height;
-
-		static mesh_id quad_mesh;
-		static shader_id render_texture_shader;
+		mesh_id quad_mesh;
+		shader_id render_texture_shader;
 
 	};
 
-	static bool init();
-	static void deinit();
+	void draw_line_gizmo(glm::vec3 a, glm::vec3 b, glm::vec3 color);
+	void draw_sphere(glm::vec3 position, float radius, glm::vec3 color);
+	void draw_cube_gizmo(glm::vec3 position, glm::vec3 scale, glm::quat rotation, glm::vec3 color);
+
+	texture_id load_texture_gpu(const texture::load_settings& settings);
+	texture_id allocate_texture_gpu(const texture::allocate_settings& settings);
+	bool       unload_texture_gpu(const texture_id& id);
+
+	void load_mesh_gpu(const mesh::load_settings& settings, std::vector<mesh_id>& loaded_meshes);
+	mesh_id allocate_mesh_gpu(const mesh::allocate_settings& settings);
+	bool    unload_mesh_gpu(const mesh_id& id);
+
+	shader_id load_shader_gpu(const shader::load_settings& settings);
+	shader_id create_shader_gpu(const shader::allocate_settings& settings);
+
+	render_target_id create_render_target(const render_target::allocate_settings& settings);
+	void init_default_resources();
+
+
+	bool init();
+	void deinit();
 
 	// Create a glfw window and data representation and adds it to an entity
-	static bool create_window(int width, int height, const char* title);
+	bool create_window(int width, int height, const char* title);
 
 	// Create a glfw window and data representation and adds it to an entity
-	static bool set_window_size(int width, int height);
+	bool set_window_size(int width, int height);
 
-	static bool bind_render_target(const render_target_id id);
-	static void unbind_render_target();
+	bool bind_render_target(const render_target_id id);
+	void unbind_render_target();
 
-	static void render_imgui(peetcs::archetype_pool& pool, std::vector<std::shared_ptr<gui_interface>> guis);
-	static bool start_frame();
+	void render_imgui(peetcs::archetype_pool& pool, std::vector<std::shared_ptr<gui_interface>> guis);
+	bool start_frame();
 
-	static void render_frame(peetcs::archetype_pool& pool);
+	void render_frame(peetcs::archetype_pool& pool);
+	void render_debug_draw_calls(const camera_data& camera, const transform_data& camera_transform);
+
 
 	struct primitives
 	{
@@ -386,10 +388,14 @@ public:
 	};
 
 private:
-	static void render_meshes(peetcs::archetype_pool& pool);
-	static void render_unlit_material_meshes(peetcs::archetype_pool& pool, const camera_data& camera,
+	resources _resources = {};
+	debug _debug = {};
+
+
+	void render_meshes(peetcs::archetype_pool& pool);
+	void render_unlit_material_meshes(peetcs::archetype_pool& pool, const camera_data& camera,
 	                                         const transform_data& camera_transform);
-	static void render_misc_material_meshes(peetcs::archetype_pool& pool, const camera_data& camera,
+	void render_misc_material_meshes(peetcs::archetype_pool& pool, const camera_data& camera,
 		const transform_data& camera_transform);
 };
 
@@ -429,19 +435,6 @@ inline glm::vec3 pipo::transform_data::get_pos() const
 {
 	return glm::vec3(position[0], position[1], position[2]);
 }
-
-
-template <>
-struct std::hash<pipo::mesh_id>
-{
-	std::size_t operator()(const pipo::mesh_id& id) const noexcept;
-};
-
-template <>
-struct std::hash<pipo::render_target_id>
-{
-	std::size_t operator()(const pipo::render_target_id& id) const noexcept;
-};
 
 
 /*#define DECLARE_TYPE_ID(type, idval) \

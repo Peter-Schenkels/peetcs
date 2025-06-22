@@ -3,8 +3,13 @@
 
 #include "include/archetype_pool.hpp"
 #include "include/dll_macros.hpp"
+#include "include/pipo/rasterizer.hpp"
 
-API_DECLARE_FUNC(void, tick, peetcs::archetype_pool&)
+typedef void (*tick_func_ptr_t)(peetcs::archetype_pool&, pipo&); inline tick_func_ptr_t tick_ptr;
+
+extern "C" {
+	__declspec(dllimport) void tick_api(peetcs::archetype_pool&, pipo&);
+}
 
 struct phesycs
 {
@@ -25,9 +30,9 @@ struct phesycs
 		loaded = false;
 	}
 
-	static void tick(peetcs::archetype_pool& pool)
+	static void tick(peetcs::archetype_pool& pool, pipo& gpu_context)
 	{
-		tick_ptr(pool);
+		tick_ptr(pool, gpu_context);
 	}
 };
 

@@ -90,7 +90,7 @@ public:
 
 		float position[3] = {0, 0, 0};
 		float scale[3] = { 1, 1, 1 };
-		float rotation[3] = { 0, 0, 0 };
+		float rotation[4] = { 0, 0, 0 };
 
 		peetcs::entity_id parent = std::numeric_limits<peetcs::entity_id>::max();
 
@@ -102,6 +102,7 @@ public:
 		void set_pos(glm::vec3 pos);
 		void set_scale(float x, float y, float z);
 		void set_rotation(float pitch, float yaw, float roll);
+		void set_rotation(const glm::quat& quat);
 
 		glm::mat4 get_local_space() const;
 		glm::mat4 get_world_space(peetcs::archetype_pool& pool) const;
@@ -292,6 +293,9 @@ public:
 		int height;
 
 		mesh_id quad_mesh;
+		mesh_id plane_mesh;
+		mesh_id cube_mesh;
+		mesh_id sphere_mesh;
 		shader_id render_texture_shader;
 
 	};
@@ -306,6 +310,10 @@ public:
 
 	void load_mesh_gpu(const mesh::load_settings& settings, std::vector<mesh_id>& loaded_meshes);
 	mesh_id allocate_mesh_gpu(const mesh::allocate_settings& settings);
+	mesh_id get_quad() const;
+	mesh_id get_plane() const;
+	mesh_id get_sphere() const;
+	mesh_id get_cube() const;
 	bool    unload_mesh_gpu(const mesh_id& id);
 
 	shader_id load_shader_gpu(const shader::load_settings& settings);
@@ -348,41 +356,32 @@ public:
 				glm::vec3{0.f, 0.f, -1.f}  // Z-axis
 			};
 
+			static inline mesh::vertex_layout layout = mesh::vertex_layout::debug;
+
 			static inline std::vector<unsigned int> indices{
-				//Top
-				2, 6, 7,
-				2, 3, 7,
-
-				//Bottom
-				0, 4, 5,
-				0, 1, 5,
-
-				//Left
-				0, 2, 6,
-				0, 4, 6,
-
-				//Right
-				1, 3, 7,
-				1, 5, 7,
-
-				//Front
-				0, 2, 3,
-				0, 1, 3,
-
-				//Back
-				4, 6, 7,
-				4, 5, 7
+			     0, 1, 5,  5, 1, 6,
+			     1, 2, 6,  6, 2, 7,
+			     2, 3, 7,  7, 3, 8,
+			     3, 4, 8,  8, 4, 9,
+			    10,11, 0,  0,11, 1,
+			     5, 6,12, 12, 6,13
 			};
 
 			static inline std::vector<glm::vec3> vertices{
-			{	-1, -1,  1, },
-			{	 1, -1,  1, },
-			{	-1,  1,  1, },
-			{	 1,  1,  1, },
-			{	-1, -1, -1, },
-			{	 1, -1, -1, },
-			{	-1,  1, -1, },
-			{	 1,  1, -1, },
+				{-1,-1,1},
+				{ 1,-1,-1},
+				{ 1, 1,-1},
+				{-1, 1,-1},
+				{-1,-1,-1},
+				{-1,-1, 1},
+				{ 1,-1, 1},
+				{ 1, 1, 1},
+				{-1, 1, 1},
+				{-1,-1, 1},
+				{-1, 1,-1},
+				{ 1, 1,-1},
+				{-1, 1, 1},
+				{ 1, 1, 1}
 			};
 		};
 	};
@@ -402,9 +401,9 @@ private:
 
 inline void pipo::transform_data::set_rotation(float pitch, float yaw, float roll)
 {
-	rotation[0] = pitch;
-	rotation[1] = yaw;
-	rotation[2] = roll;
+	glm::vec3 eulerAngles = { pitch, yaw, roll };
+	auto quat = glm::quat(eulerAngles);
+	set_rotation(quat);
 }
 
 inline void pipo::transform_data::set_scale(float x, float y, float z)
@@ -423,7 +422,7 @@ inline void pipo::transform_data::set_pos(float x, float y, float z)
 
 inline glm::quat pipo::transform_data::get_rotation() const
 {
-	return glm::quat(glm::vec3(rotation[0], rotation[1], rotation[2]));
+	return glm::quat( rotation[0], rotation[1], rotation[2], rotation[3]);
 }
 
 inline glm::vec3 pipo::transform_data::get_scale() const

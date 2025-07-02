@@ -22,6 +22,8 @@
 
 #include <iostream>
 #include <sstream>
+#include <glm/common.hpp>
+#include <glm/common.hpp>
 
 
 pipo::shader_id pipo::unlit_material_data::program = {};
@@ -54,12 +56,15 @@ layout (location = 2) in vec2 aTexCoord;
 
 out vec2 TexCoord;
 out vec3 Normal;
+out vec3 FragPos;
+
 
 void main()
 {
     gl_Position = projection * view * model * vec4(aPos, 1.0);
 	TexCoord = aTexCoord;
-	Normal = aNormal;
+	Normal =  mat3(transpose(inverse(model))) * aNormal;  ;
+    FragPos = vec3(model * vec4(aPos, 1.0));
 })";
 
 char fragment_shader_unlit_code[] = R"(	
@@ -67,11 +72,21 @@ char fragment_shader_unlit_code[] = R"(
 out vec4 FragColor;
 in vec2 TexCoord;
 in vec3 Normal;
+in vec3 FragPos;  
 uniform sampler2D main_texture;
+
+float lerp(float v0, float v1, float t) {
+  return v0 + t * (v1 - v0);
+}
 
 void main()
 {
-    FragColor = texture(main_texture, TexCoord);
+	vec3 norm = normalize(Normal);
+	vec3 lightDir = normalize(vec3(0,0,1) - FragPos);  
+    float diff = max(dot(norm, lightDir), 0.0);
+
+    FragColor = texture(main_texture, TexCoord) * lerp(0.4, 1, diff);
+
 } )";
 
 
@@ -85,6 +100,7 @@ out vec2 TexCoord;
 void main(){
     gl_Position = vec4(aPos, 1.0);
 	TexCoord = aTexCoord;
+
 }
 )";
 
@@ -168,31 +184,59 @@ void pipo::init_default_resources()
 		debug::debug_shader_id = pipo::create_shader_gpu(shader_settings);
     }
 
+    static float vertices[] = {
+        // x,     y,     z,     u,    v
+        -1.f,  1.f,  0.0f,  0.0f, 1.0f,  // v0 - top-left
+         1.f,  1.f,  0.0f,  1.0f, 1.0f,  // v1 - top-right
+         1.f, -1.f,  0.0f,  1.0f, 0.0f,  // v2 - bottom-right
+        -1.f, -1.f,  0.0f,  0.0f, 0.0f   // v3 - bottom-left
+    };
+
+    static unsigned int indices[] = {
+        0, 3, 1,   // Triangle 1
+        1, 3, 2    // Triangle 2
+    };
+    mesh::allocate_settings settings;
+    settings.layout = mesh::vertex_3d;
+    settings.indices = (unsigned char*)indices;
+    settings.vertices = (unsigned char*)vertices;
+    settings.nb_of_indices = 6;
+    settings.nb_of_vertices = 4;
+
+    _resources.quad_mesh = allocate_mesh_gpu(settings);
+
+
     {
-        // Create mesh primitive quad (corrected indices)
-        static float vertices[] = {
-            // x,     y,     z,     u,    v
-            -1.f,  1.f,  0.0f,  0.0f, 1.0f,  // v0 - top-left
-             1.f,  1.f,  0.0f,  1.0f, 1.0f,  // v1 - top-right
-             1.f, -1.f,  0.0f,  1.0f, 0.0f,  // v2 - bottom-right
-            -1.f, -1.f,  0.0f,  0.0f, 0.0f   // v3 - bottom-left
-        };
+        mesh::load_settings settings;
+        char filepath[] = "Assets//Models//quad.obj";
+        settings.file_path = filepath;
 
-        // Corrected indices - both triangles now CCW
-        static unsigned int indices[] = {
-            0, 3, 1,   // Triangle 1
-            1, 3, 2    // Triangle 2
-        };
+        std::vector<pipo::mesh_id> meshes;
+		load_mesh_gpu(settings, meshes);
 
+        _resources.plane_mesh = meshes.front();
+    }
 
-        mesh::allocate_settings settings;
-        settings.layout = mesh::vertex_3d;
-        settings.indices = (unsigned char*)indices;
-        settings.vertices = (unsigned char*)vertices;
-        settings.nb_of_indices = 6;
-        settings.nb_of_vertices = 4;
+	{
+        mesh::load_settings settings;
+        char filepath[] = "Assets//Models//cube.obj";
+        settings.file_path = filepath;
 
-        _resources.quad_mesh = allocate_mesh_gpu(settings);
+        std::vector<pipo::mesh_id> meshes;
+		load_mesh_gpu(settings, meshes);
+
+        _resources.cube_mesh = meshes.front();
+    }
+
+	{
+        mesh::load_settings settings;
+        char filepath[] = "Assets//Models//sphere.obj";
+        settings.file_path = filepath;
+
+        std::vector<pipo::mesh_id> meshes;
+		load_mesh_gpu(settings, meshes);
+
+        _resources.sphere_mesh = meshes.front();
     }
 
     // Set GL render state
@@ -239,7 +283,7 @@ bool pipo::create_window(int width, int height, const char* title)
 
     glfwMakeContextCurrent((GLFWwindow*)_resources.window);
 
-    if (glewInit() != GLEW_OK) {      // ✅ Loads OpenGL function pointers
+    if (glewInit() != GLEW_OK) {
         std::cerr << "GLEW init failed\n";
         return false;
     }
@@ -383,6 +427,7 @@ void pipo::render_misc_material_meshes(peetcs::archetype_pool& pool, const pipo:
 		int loc_model = glGetUniformLocation(material.program, "model");
 
 		if (!camera_uniforms_set)
+		if (!camera_uniforms_set)
 		{
 			int loc_view = glGetUniformLocation(material.program, "view");
 			int loc_proj = glGetUniformLocation(material.program, "projection");
@@ -522,6 +567,14 @@ void pipo::transform_data::set_pos(glm::vec3 pos)
     position[2] = pos.z;
 }
 
+void pipo::transform_data::set_rotation(const glm::quat& quat)
+{
+    rotation[0] = quat.w;
+    rotation[1] = quat.x;
+    rotation[2] = quat.y;
+    rotation[3] = quat.z;
+}
+
 glm::mat4 pipo::transform_data::get_local_space() const
 {
     return get_model(*this);
@@ -594,7 +647,7 @@ void pipo::render_debug_draw_calls(const camera_data& camera, const transform_da
     bool camera_uniforms_set = false;
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    glDisable(GL_DEPTH_TEST);
+    //glDisable(GL_DEPTH_TEST);
     glLineWidth(2.0f);
 
     GL_CALL(glUseProgram(pipo::debug::debug_shader_id));
@@ -626,7 +679,7 @@ void pipo::render_debug_draw_calls(const camera_data& camera, const transform_da
 	}
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glEnable(GL_DEPTH_TEST);
+    //glEnable(GL_DEPTH_TEST);
 }
 
 void pipo::debug::clear_draw_calls()
@@ -901,6 +954,26 @@ pipo::mesh_id pipo::allocate_mesh_gpu(const mesh::allocate_settings& settings)
 
     _resources.meshes.push_back(allocated_mesh);
     return allocated_mesh.id;
+}
+
+pipo::mesh_id pipo::get_quad() const
+{
+    return _resources.quad_mesh;
+}
+
+pipo::mesh_id pipo::get_plane() const
+{
+    return _resources.plane_mesh;
+}
+
+pipo::mesh_id pipo::get_sphere() const
+{
+    return _resources.sphere_mesh;
+}
+
+pipo::mesh_id pipo::get_cube() const
+{
+    return _resources.cube_mesh;
 }
 
 bool pipo::unload_mesh_gpu(const mesh_id& id)

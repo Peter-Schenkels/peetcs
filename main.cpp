@@ -23,17 +23,39 @@ int main()
 		// Setup GPU resources
 		rasterizer.init_default_resources();
 
-		pipo::mesh::load_settings mesh_settings;
-		char mesh_filepath[] = R"(Assets\models\carkel.obj)";
-		mesh_settings.file_path = mesh_filepath;
+		pipo::texture_id carkel_texture;
+		{
+			pipo::texture::load_settings texture_settings;
+			char texture_filepath[] = R"(Assets\textures\carkel texture.png)";
+			texture_settings.file_path = texture_filepath;
+			carkel_texture = rasterizer.load_texture_gpu(texture_settings);
+		}
 
-		pipo::texture::load_settings texture_settings;
-		char texture_filepath[] = R"(Assets\textures\carkel texture.png)";
-		texture_settings.file_path = texture_filepath;
-		pipo::texture_id carkel_texture = rasterizer.load_texture_gpu(texture_settings);
+		pipo::texture_id background_texture;
+		{
+			pipo::texture::load_settings texture_settings;
+			char texture_filepath[] = R"(Assets\textures\ground.png)";
+			texture_settings.file_path = texture_filepath;
+			texture_settings.nearest_neighbour = true;
+			background_texture = rasterizer.load_texture_gpu(texture_settings);
+		}
 
-		std::vector<pipo::mesh_id> meshes;
-		rasterizer.load_mesh_gpu(mesh_settings, meshes);
+		pipo::texture_id cube_texture;
+		{
+			pipo::texture::load_settings texture_settings;
+			texture_settings.nearest_neighbour = true;
+			char texture_filepath[] = R"(Assets\textures\cube.png)";
+			texture_settings.file_path = texture_filepath;
+			cube_texture = rasterizer.load_texture_gpu(texture_settings);
+		}
+
+		std::vector<pipo::mesh_id> carkel_mesh;
+		{
+			pipo::mesh::load_settings mesh_settings;
+			char mesh_filepath[] = R"(Assets\models\carkel.obj)";
+			mesh_settings.file_path = mesh_filepath;
+			rasterizer.load_mesh_gpu(mesh_settings, carkel_mesh);
+		}
 
 		pipo::render_target::allocate_settings render_target_settings = {};
 		render_target_settings.width = 1920;
@@ -59,42 +81,46 @@ int main()
 		peetcs::entity_id camera = 1;
 
 		{
+			int start_entity = triangle;
 			int amount = 100;
 			peetcs::entity_id last_entity = 0;
 			// Setup car entities
-			for (int i = triangle; i < amount; i++)
+			for (int i = triangle; i < amount + start_entity; i++)
 			{
 				triangle = i + 1;
-
-				int x = i % (int)sqrt(amount) - sqrt(amount) / 2;
-				int y = i / (int)sqrt(amount) - sqrt(amount) / 2;
+				int dim = pow(amount, 1.f / 3.f);
+				float z = i / (dim * dim);
+				float y = (i % (dim * dim)) / dim - dim /2.f;
+				float x = i % dim - dim / 2.f;
+				float padding = 1.f;
+				z = z * padding + z;
+				y = y * padding + y;
+				x = x * padding + x;
 
 				pipo::mesh_renderer_data& mesh_render = pool.add<pipo::mesh_renderer_data>(triangle);
-				mesh_render.mesh_id = meshes.front();
+				//mesh_render.mesh_id = rasterizer.get_quad();
+				mesh_render.mesh_id = rasterizer.get_cube();
 				mesh_render.visible = i % 1 == 0;
 
 				pipo::unlit_material_data& material = pool.add<pipo::unlit_material_data>(triangle);
-				material.main_texture = carkel_texture;
+				material.main_texture = cube_texture;
 
 				pipo::transform_data& triangle_transform = pool.add<pipo::transform_data>(triangle);
-				triangle_transform.set_pos(x, y, 0);
-				triangle_transform.set_rotation(x, y, 0);
-
-				triangle_transform.set_scale(1.f, 1.f, 1.f);
+				//triangle_transform.set_rotation(x/1, x / 1, x / 1);
 
 				phesycs_impl::box_collider_data& box_collider = pool.add<phesycs_impl::box_collider_data>(triangle);
-				box_collider.transform.set_scale(1.5, 1.5, 1.5);
-				pool.add<phesycs_impl::rigid_body_data>(triangle);
-				if (last_entity != 0 )
-				{
-					//triangle_transform.parent = last_entity;
-				}
-				else
-				{
-					triangle_transform.set_scale(0.1f, 0.1f, 0.1f);
-				}
+				box_collider.transform.set_scale(1.0, 1.0, 1.0);
+				auto& rigidbody = pool.add<phesycs_impl::rigid_body_data>(triangle);
+				rigidbody.angular_velocity[0] = 0;
+				rigidbody.angular_velocity[1] = 0;
+				//rigidbody.set_translational_velocity(-1.f * glm::normalize(triangle_transform.get_pos()));
+				triangle_transform.set_pos(x, -3 + z, y);
+				//rigidbody.velocity[1] = x * -1;
+				rigidbody.set_mass(1, box_collider);
+				rigidbody.is_static = false;
 
-				//last_entity = triangle;
+				float scale = 0.5;
+				triangle_transform.set_scale(scale, scale, scale);
 
 				pool.emplace_commands();
 			}
@@ -103,8 +129,13 @@ int main()
 			{
 				pipo::camera_data& camera_data = pool.add<pipo::camera_data>(camera);
 				pipo::transform_data& camera_transform = pool.add<pipo::transform_data>(camera);
+				//phesycs_impl::rigid_body_data& camera_rigidbody = pool.add<phesycs_impl::rigid_body_data>(camera);
 
-				camera_transform.set_pos(0, 0, 2);
+				//phesycs_impl::box_collider_data& camera_collider = pool.add<phesycs_impl::box_collider_data>(camera);
+
+				//camera_rigidbody.set_mass(100.f, camera_collider);
+				//camera_rigidbody.is_static = true;
+				camera_transform.set_pos(0, 0, 10);
 				camera_transform.set_rotation(0, 0, 0);
 
 				camera_data.c_near = 0.1f;
@@ -118,6 +149,26 @@ int main()
 				pool.emplace_commands();
 			}
 		}
+
+		peetcs::entity_id platform = triangle + 1;
+		pipo::mesh_renderer_data& platform_mesh_renderer = pool.add<pipo::mesh_renderer_data>(platform);
+		platform_mesh_renderer.mesh_id = rasterizer.get_plane();
+		platform_mesh_renderer.visible = true;
+		pipo::transform_data& platform_transform = pool.add<pipo::transform_data>(platform);
+		pipo::unlit_material_data& material = pool.add<pipo::unlit_material_data>(platform);
+		material.main_texture = background_texture;
+
+		platform_transform.set_scale(10, 2, 10);
+		platform_transform.set_pos(0, -6, -5);
+		platform_transform.set_rotation(0, 0, 0);
+
+		phesycs_impl::rigid_body_data& platform_rigidbody = pool.add<phesycs_impl::rigid_body_data>(platform);
+		platform_rigidbody.is_static = true;
+		phesycs_impl::box_collider_data& platform_collider = pool.add<phesycs_impl::box_collider_data>(platform);
+
+		float scale = 1.f;
+		platform_collider.transform.set_scale(scale, scale, scale);
+		pool.emplace_commands();
 	}
 
 	// Setup Debug imguis
@@ -132,45 +183,12 @@ int main()
 		rasterizer.render_imgui(pool, debug_guis);
 		rasterizer.render_frame(pool);
 
-		auto camera_query = pool.query<pipo::camera_data, pipo::transform_data>();
-		for (auto camera_value : camera_query)
-		{
-			pipo::transform_data& camera_transform = camera_value.get<pipo::transform_data>();
-			/*camera_transform.position[0] += 0.001f;
-			camera_transform.position[1] += 0.001f;
-			camera_transform.position[2] += 0.010f;
-			camera_transform.rotation[2] -= 0.001f;*/
-		}
-
-
-		float lastpos[3] = { 0, 0, 0 };
-		int i = 0;
-
-		auto mesh_query = pool.query<pipo::mesh_renderer_data, pipo::transform_data>();
-		for (auto query : mesh_query)
-		{
-		
-			i++;
-			pipo::transform_data& transform = query.get<pipo::transform_data>();
-
-
-			if (transform.parent == UINT32_MAX)
-			{
-				//transform.rotation[2] += 0.1f;
-				transform.rotation[1] += 0.1f;
-				//rasterizer.draw_cube_gizmo(transform.get_pos(), transform.get_scale(), transform.get_rotation(), glm::vec3(1, 0, 0));
-				//rasterizer.draw_line_gizmo(transform.get_pos(), glm::vec3(0,0,0), glm::vec3(1, 0, 0));
-
-				lastpos[0] = transform.position[0];
-				lastpos[1] = transform.position[1];
-				lastpos[2] = transform.position[2];
-			}
-		}
-
 		if (phesycs::loaded)
 		{
 			phesycs::tick(pool, rasterizer);
 		}
+
+		rasterizer.draw_cube_gizmo({ 0,4,-10 }, { 1,1,1 }, { 0,0,0,1 }, {0,1,0});
 	}
 
 	// Exit

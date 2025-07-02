@@ -3,11 +3,10 @@
 // BEGIN Library export
 #define API_NAME(func) func##_func_ptr_t
 
-#define API_DECLARE_FUNC(return_type, func, ...)\
-	API_FUNCTION(return_type, func, __VA_ARGS__)\
-	inline API_NAME(func) func##_ptr;\
-	extern "C" { \
-	SHARED_LIBRARY_API return_type func##_api(__VA_ARGS__); }\
+#define DECLARE_API_FUNC(name, ret_type, ...) \
+    typedef ret_type (*name##_func_ptr_t)(__VA_ARGS__); \
+    inline name##_func_ptr_t name##_ptr; \
+    extern "C" __declspec(dllimport) ret_type name##_api(__VA_ARGS__);
 
 
 #define API_FUNCTION(return_type, func, ...)\
@@ -38,7 +37,7 @@
 #define API_DEFINE_FUNC(func)\
 	func##_ptr = (API_NAME(func))GetProcAddress(dll, #func"_api");\
     if (!(func##_ptr)) {\
-		std::cerr << "Failed to get function!" << std::endl;\
+		std::cerr << "Failed to get function! "  << #func"_api" << std::endl;\
 		FreeLibrary(dll);\
 		return 1;\
 	}\

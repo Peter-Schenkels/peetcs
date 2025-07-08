@@ -24,6 +24,7 @@
 #include <sstream>
 #include <glm/common.hpp>
 #include <glm/common.hpp>
+#include <utility>
 
 
 pipo::shader_id pipo::unlit_material_data::program = {};
@@ -79,13 +80,18 @@ float lerp(float v0, float v1, float t) {
   return v0 + t * (v1 - v0);
 }
 
+
+
 void main()
 {
 	vec3 norm = normalize(Normal);
-	vec3 lightDir = normalize(vec3(0,0,1) - FragPos);  
+	vec3 lightDir = normalize(vec3(-1,-1,0));  
     float diff = max(dot(norm, lightDir), 0.0);
-
-    FragColor = texture(main_texture, TexCoord) * lerp(0.4, 1, diff);
+	float intensity = lerp(0.0, 1, diff);
+	vec3 color = vec3(texture(main_texture, TexCoord));
+	vec3 ambient_color = color * vec3(94f/255f, 156f/255f, 1);
+	
+    FragColor = vec4(lerp(color.r, ambient_color.r, intensity), lerp(color.g, ambient_color.g, intensity), lerp(color.b, ambient_color.b, intensity), 1);
 
 } )";
 
@@ -282,6 +288,7 @@ bool pipo::create_window(int width, int height, const char* title)
     _resources.height = height;
 
     glfwMakeContextCurrent((GLFWwindow*)_resources.window);
+    glfwSwapInterval(0);
 
     if (glewInit() != GLEW_OK) {
         std::cerr << "GLEW init failed\n";
@@ -298,7 +305,8 @@ bool pipo::create_window(int width, int height, const char* title)
     ImGui_ImplGlfw_InitForOpenGL((GLFWwindow*)_resources.window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
-    glfwSwapInterval(0);
+    //glfwSwapInterval(0);
+    glClearColor(94/255.f, 156 / 255.f, 255 / 255.f, 1);
 
     return true;
 }
@@ -560,6 +568,11 @@ void pipo::render_frame(peetcs::archetype_pool& pool)
 }
 
 
+glm::vec3 pipo::transform_data::get_euler_rotation() const
+{
+    return glm::eulerAngles(get_rotation());
+}
+
 void pipo::transform_data::set_pos(glm::vec3 pos)
 {
     position[0] = pos.x;
@@ -615,6 +628,65 @@ void pipo::draw_line_gizmo(const glm::vec3 a, const glm::vec3 b, const glm::vec3
 void replace(void* calls)
 {
 
+}
+
+void pipo::draw_vertices(const std::vector<glm::vec3>& vertices, const std::vector<unsigned int>& indices, glm::vec3 color)
+{
+    debug::draw_call draw_call = {};
+
+    draw_call.color = color;
+    draw_call.vertices.reserve(vertices.size());
+
+    for (auto& vertex : vertices)
+    {
+        draw_call.vertices.emplace_back(vertex, 1.0f);
+    }
+
+    draw_call.indices = indices;
+    draw_call.model_matrix = glm::mat4(1);
+    _debug.queued_draw_calls.push_back(draw_call);
+}
+
+void pipo::draw_aabb(const glm::vec3& min, glm::vec3& max, glm::vec3 color)
+{
+    std::vector<glm::vec3> vertices = {
+        { min.x, min.y, min.z }, // v0
+        { max.x, min.y, min.z }, // v1
+        { max.x, max.y, min.z }, // v2
+        { min.x, max.y, min.z }, // v3
+        { min.x, min.y, max.z }, // v4
+        { max.x, min.y, max.z }, // v5
+        { max.x, max.y, max.z }, // v6
+        { min.x, max.y, max.z }  // v7
+    };
+
+    std::vector<unsigned int> indices = {
+        // Front face (z = max)
+        4, 5, 6,
+        6, 7, 4,
+
+        // Back face (z = min)
+        0, 3, 2,
+        2, 1, 0,
+
+        // Left face (x = min)
+        0, 4, 7,
+        7, 3, 0,
+
+        // Right face (x = max)
+        1, 2, 6,
+        6, 5, 1,
+
+        // Top face (y = max)
+        3, 7, 6,
+        6, 2, 3,
+
+        // Bottom face (y = min)
+        0, 1, 5,
+        5, 4, 0
+    };
+
+    draw_vertices(vertices, indices, color);
 }
 
 void pipo::draw_cube_gizmo(glm::vec3 position, glm::vec3 scale, glm::quat rotation, glm::vec3 color)

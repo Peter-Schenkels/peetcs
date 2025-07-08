@@ -155,6 +155,6 @@ add_project(PHESYCS
 
 # define the target
 add_project(TESTER
-            COMMAND 
+            GUI_APP 
             SOURCES ${SRC_MAIN}
             DEPENDS PEETCS PIPO PHESYCS)

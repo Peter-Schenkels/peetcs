@@ -1,7 +1,9 @@
 #pragma once
 
+#include <numbers>
 #include <vector>
-
+#include <array>
+#include <math.h>
 #include <glm/vec3.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -97,12 +99,14 @@ public:
 		glm::vec3 get_pos() const;
 		glm::vec3 get_scale() const;
 		glm::quat get_rotation() const;
+		glm::vec3 get_euler_rotation() const;
 
 		void set_pos(float x, float y, float z);
 		void set_pos(glm::vec3 pos);
 		void set_scale(float x, float y, float z);
 		void set_rotation(float pitch, float yaw, float roll);
 		void set_rotation(const glm::quat& quat);
+		void set_rotation(const glm::vec3& euler);
 
 		glm::mat4 get_local_space() const;
 		glm::mat4 get_world_space(peetcs::archetype_pool& pool) const;
@@ -158,6 +162,11 @@ public:
 
 		void* window;
 		glm::vec2 size;
+	};
+
+	struct directional_light_data
+	{
+		
 	};
 
 	struct texture
@@ -302,6 +311,8 @@ public:
 
 	void draw_line_gizmo(glm::vec3 a, glm::vec3 b, glm::vec3 color);
 	void draw_sphere(glm::vec3 position, float radius, glm::vec3 color);
+	void draw_vertices(const std::vector<glm::vec3>& vertices, const std::vector<unsigned int>& indices, glm::vec3 color);
+	void draw_aabb(const glm::vec3& min, glm::vec3& max, glm::vec3 color);
 	void draw_cube_gizmo(glm::vec3 position, glm::vec3 scale, glm::quat rotation, glm::vec3 color);
 
 	texture_id load_texture_gpu(const texture::load_settings& settings);
@@ -359,29 +370,29 @@ public:
 			static inline mesh::vertex_layout layout = mesh::vertex_layout::debug;
 
 			static inline std::vector<unsigned int> indices{
-			     0, 1, 5,  5, 1, 6,
-			     1, 2, 6,  6, 2, 7,
-			     2, 3, 7,  7, 3, 8,
-			     3, 4, 8,  8, 4, 9,
-			    10,11, 0,  0,11, 1,
-			     5, 6,12, 12, 6,13
+				// Front face
+				4, 5, 6,  4, 6, 7,
+				// Back face
+				1, 0, 3,  1, 3, 2,
+				// Left face
+				0, 4, 7,  0, 7, 3,
+				// Right face
+				5, 1, 2,  5, 2, 6,
+				// Top face
+				3, 7, 6,  3, 6, 2,
+				// Bottom face
+				0, 1, 5,  0, 5, 4
 			};
 
-			static inline std::vector<glm::vec3> vertices{
-				{-1,-1,1},
-				{ 1,-1,-1},
-				{ 1, 1,-1},
-				{-1, 1,-1},
-				{-1,-1,-1},
-				{-1,-1, 1},
-				{ 1,-1, 1},
-				{ 1, 1, 1},
-				{-1, 1, 1},
-				{-1,-1, 1},
-				{-1, 1,-1},
-				{ 1, 1,-1},
-				{-1, 1, 1},
-				{ 1, 1, 1}
+			static inline std::array<glm::vec3, 8> vertices = {
+				glm::vec3{-1, -1, -1}, // 0
+				glm::vec3{ 1, -1, -1}, // 1
+				glm::vec3{ 1,  1, -1}, // 2
+				glm::vec3{-1,  1, -1}, // 3
+				glm::vec3{-1, -1,  1}, // 4
+				glm::vec3{ 1, -1,  1}, // 5
+				glm::vec3{ 1,  1,  1}, // 6
+				glm::vec3{-1,  1,  1}  // 7
 			};
 		};
 	};
@@ -398,10 +409,15 @@ private:
 		const transform_data& camera_transform);
 };
 
+inline void pipo::transform_data::set_rotation(const glm::vec3& euler)
+{
+	set_rotation(euler.x, euler.y, euler.z);
+}
+
 
 inline void pipo::transform_data::set_rotation(float pitch, float yaw, float roll)
 {
-	glm::vec3 eulerAngles = { pitch, yaw, roll };
+	glm::vec3 eulerAngles = { fmod(pitch, std::numbers::pi * 2.f), fmod(yaw, std::numbers::pi * 2.f), fmod(roll, std::numbers::pi * 2.f) };
 	auto quat = glm::quat(eulerAngles);
 	set_rotation(quat);
 }

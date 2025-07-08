@@ -7,12 +7,14 @@
 #include "include/pipo/rasterizer.hpp"
 
 
-void tick_api(peetcs::archetype_pool& c_pool, pipo& gpu_context)
+void tick_integration_api(peetcs::archetype_pool& c_pool, pipo& gpu_context)
 {
-	peetcs::archetype_pool& pool = c_pool;
-	auto query = pool.query<pipo::transform_data, pipo::mesh_renderer_data, pipo::unlit_material_data>();
+	phesycs_impl::tick_integration(c_pool, gpu_context);
+}
 
-	phesycs_impl::tick(pool, gpu_context);
+void tick_collision_response_api(peetcs::archetype_pool& c_pool, pipo& gpu_context)
+{
+	phesycs_impl::tick_collision_response(c_pool, gpu_context);
 }
 
 // Apply a linear impulse directly to the center of mass

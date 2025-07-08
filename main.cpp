@@ -5,10 +5,17 @@
 #include "include/archetype_pool.hpp"
 #include "include/phesycs/phesycs.hpp"
 
+#include <math.h>
+#include <numbers>
+
 #include "include/pipo/imgui.hpp"
 #include "include/pipo/rasterizer.hpp"
 #include "tests/shared.hpp"
 
+struct platform_data
+{
+	constexpr static uint16_t id = 123;
+};
 
 int main()
 {
@@ -82,41 +89,41 @@ int main()
 
 		{
 			int start_entity = triangle;
-			int amount = 100;
+			int amount = 300;
 			peetcs::entity_id last_entity = 0;
 			// Setup car entities
 			for (int i = triangle; i < amount + start_entity; i++)
 			{
 				triangle = i + 1;
 				int dim = pow(amount, 1.f / 3.f);
-				float z = i / (dim * dim);
-				float y = (i % (dim * dim)) / dim - dim /2.f;
-				float x = i % dim - dim / 2.f;
+				int x = i % dim - dim/2.f;
+				int y = (i / dim) % dim - dim / 2.f;
+				int z = i / (dim * dim);
 				float padding = 1.f;
-				z = z * padding + z;
+				//z = z * padding + z;
 				y = y * padding + y;
 				x = x * padding + x;
+				z = z * padding + z;
 
 				pipo::mesh_renderer_data& mesh_render = pool.add<pipo::mesh_renderer_data>(triangle);
 				//mesh_render.mesh_id = rasterizer.get_quad();
 				mesh_render.mesh_id = rasterizer.get_cube();
-				mesh_render.visible = i % 1 == 0;
+				mesh_render.visible = true;
 
 				pipo::unlit_material_data& material = pool.add<pipo::unlit_material_data>(triangle);
 				material.main_texture = cube_texture;
 
 				pipo::transform_data& triangle_transform = pool.add<pipo::transform_data>(triangle);
-				//triangle_transform.set_rotation(x/1, x / 1, x / 1);
 
 				phesycs_impl::box_collider_data& box_collider = pool.add<phesycs_impl::box_collider_data>(triangle);
 				box_collider.transform.set_scale(1.0, 1.0, 1.0);
 				auto& rigidbody = pool.add<phesycs_impl::rigid_body_data>(triangle);
 				rigidbody.angular_velocity[0] = 0;
 				rigidbody.angular_velocity[1] = 0;
-				//rigidbody.set_translational_velocity(-1.f * glm::normalize(triangle_transform.get_pos()));
-				triangle_transform.set_pos(x, -3 + z, y);
-				//rigidbody.velocity[1] = x * -1;
-				rigidbody.set_mass(1, box_collider);
+				triangle_transform.set_pos(x, -2 + z, y);
+				//rigidbody.set_translational_velocity(-glm::normalize(triangle_transform.get_pos()) * 2.f);
+
+				rigidbody.set_mass(100, box_collider);
 				rigidbody.is_static = false;
 
 				float scale = 0.5;
@@ -129,19 +136,13 @@ int main()
 			{
 				pipo::camera_data& camera_data = pool.add<pipo::camera_data>(camera);
 				pipo::transform_data& camera_transform = pool.add<pipo::transform_data>(camera);
-				//phesycs_impl::rigid_body_data& camera_rigidbody = pool.add<phesycs_impl::rigid_body_data>(camera);
-
-				//phesycs_impl::box_collider_data& camera_collider = pool.add<phesycs_impl::box_collider_data>(camera);
-
-				//camera_rigidbody.set_mass(100.f, camera_collider);
-				//camera_rigidbody.is_static = true;
-				camera_transform.set_pos(0, 0, 10);
-				camera_transform.set_rotation(0, 0, 0);
+				camera_transform.set_pos(0, 10,  10);
+				camera_transform.set_rotation(-3.1415 / 4, 0, 0);
 
 				camera_data.c_near = 0.1f;
 				camera_data.c_far = 1000.0f;
 				camera_data.aspect = 1920.f / 1080;
-				camera_data.fov = 60.0f;
+				camera_data.fov = 40.0f;
 				camera_data.type = pipo::view_type::perspective;
 				camera_data.active = true;
 				camera_data.render_target = main_render_target;
@@ -150,25 +151,87 @@ int main()
 			}
 		}
 
-		peetcs::entity_id platform = triangle + 1;
-		pipo::mesh_renderer_data& platform_mesh_renderer = pool.add<pipo::mesh_renderer_data>(platform);
-		platform_mesh_renderer.mesh_id = rasterizer.get_plane();
-		platform_mesh_renderer.visible = true;
-		pipo::transform_data& platform_transform = pool.add<pipo::transform_data>(platform);
-		pipo::unlit_material_data& material = pool.add<pipo::unlit_material_data>(platform);
-		material.main_texture = background_texture;
 
-		platform_transform.set_scale(10, 2, 10);
-		platform_transform.set_pos(0, -6, -5);
-		platform_transform.set_rotation(0, 0, 0);
 
-		phesycs_impl::rigid_body_data& platform_rigidbody = pool.add<phesycs_impl::rigid_body_data>(platform);
-		platform_rigidbody.is_static = true;
-		phesycs_impl::box_collider_data& platform_collider = pool.add<phesycs_impl::box_collider_data>(platform);
 
-		float scale = 1.f;
-		platform_collider.transform.set_scale(scale, scale, scale);
-		pool.emplace_commands();
+		for (int i = 1; i < 6; i++)
+		{
+			peetcs::entity_id platform = triangle + i;
+			pipo::mesh_renderer_data& platform_mesh_renderer = pool.add<pipo::mesh_renderer_data>(platform);
+
+			platform_mesh_renderer.visible = true;
+			pipo::transform_data& platform_transform = pool.add<pipo::transform_data>(platform);
+			pipo::unlit_material_data& material = pool.add<pipo::unlit_material_data>(platform);
+			material.main_texture = background_texture;
+
+
+			phesycs_impl::rigid_body_data& platform_rigidbody = pool.add<phesycs_impl::rigid_body_data>(platform);
+			platform_rigidbody.is_static = true;
+
+			phesycs_impl::box_collider_data& platform_collider = pool.add<phesycs_impl::box_collider_data>(platform);
+
+			float scale = 1.f;
+			platform_collider.transform.set_scale(scale, scale, scale);
+
+			if (i == 1)
+			{
+				platform_mesh_renderer.mesh_id = rasterizer.get_plane();
+				platform_transform.set_scale(10, 10, 10);
+				platform_transform.set_pos(0, -15, -5);
+				platform_transform.set_rotation(0, 0, 0);
+			}
+			else if (i == 2)
+			{
+				platform_mesh_renderer.mesh_id = rasterizer.get_cube();
+				platform_transform.set_scale(1, 2, 10);
+				platform_transform.set_pos(10, -3, -5);
+				platform_transform.set_rotation(0, 0, 0);
+
+
+				//pool.add<platform_data>(platform);
+				platform_rigidbody.is_static = true;
+				//platform_rigidbody.set_mass(100000.f, platform_collider);
+				continue;;
+
+			}
+			else if (i == 3)
+			{
+				platform_mesh_renderer.mesh_id = rasterizer.get_cube();
+				platform_transform.set_scale(1, 2, 10);
+				platform_transform.set_pos(-10, -3, -5);
+				platform_transform.set_rotation(0, 0, 0);
+				pool.add<platform_data>(platform);
+				platform_rigidbody.is_static = true;
+				continue;;
+			}
+			else if (i == 4)
+			{
+				platform_mesh_renderer.mesh_id = rasterizer.get_cube();
+				platform_transform.set_scale(5, 2, 2);
+				platform_transform.set_pos(0, -3, 5);
+				platform_transform.set_rotation(0, 0, 0);
+
+				pool.add<platform_data>(platform);
+				platform_rigidbody.is_static = true;
+				//platform_rigidbody.set_mass(100000.f, platform_collider);
+
+			}
+			else if (i == 5)
+			{
+				platform_mesh_renderer.mesh_id = rasterizer.get_cube();
+				platform_transform.set_scale(10, 2, 1);
+				platform_transform.set_pos(0, -3, -15);
+				platform_transform.set_rotation(0, 0, 0);
+				//platform_rigidbody.is_static = false;
+				//platform_rigidbody.set_mass(100000.f, platform_collider);
+				continue;;
+
+			}
+
+
+
+			pool.emplace_commands();
+		}
 	}
 
 	// Setup Debug imguis
@@ -177,18 +240,31 @@ int main()
 		std::make_unique<dll_reloader<phesycs>>()
 	};
 
+	time_info time;
+
+
 	// Do game ticks
 	while (rasterizer.start_frame())
 	{
+
 		rasterizer.render_imgui(pool, debug_guis);
 		rasterizer.render_frame(pool);
+		time.tick();
+
+		auto platform_query = pool.query<platform_data, pipo::transform_data>();
+		for (auto query_value : platform_query)
+		{
+			auto& transform = query_value.get<pipo::transform_data>();
+
+			glm::quat rotation = transform.get_rotation();
+
+			transform.set_rotation(glm::angleAxis((float)fmod(glm::angle(rotation) +  time.get_delta_time() * 0.3, std::numbers::pi), glm::vec3{0.f,-1.f,0.f } ));
+		}
 
 		if (phesycs::loaded)
 		{
 			phesycs::tick(pool, rasterizer);
 		}
-
-		rasterizer.draw_cube_gizmo({ 0,4,-10 }, { 1,1,1 }, { 0,0,0,1 }, {0,1,0});
 	}
 
 	// Exit

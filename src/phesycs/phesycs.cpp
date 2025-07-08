@@ -1,9 +1,15 @@
-﻿#include "include/phesycs/phesycs.hpp"
+﻿
 #include "include/phesycs/phesycs.hpp"
-
+#include "include/phesycs/phesycs.hpp"
+#include <algorithm>
+#include <execution>
+#include <unordered_set>
 #include <glm/gtx/quaternion.hpp>
 
 #include "tests/shared.hpp"
+
+#undef min
+#undef max
 
 // ======================= AABB =============================
 
@@ -11,8 +17,8 @@
 bool aabb::overlap(const glm::vec3& point) const
 {
 	return (min.x <= point.x) && (point.x < max.x) &&
-           (min.y <= point.y) && (point.y < max.y) &&
-           (min.z <= point.z) && (point.z < max.z);
+		(min.y <= point.y) && (point.y < max.y) &&
+		(min.z <= point.z) && (point.z < max.z);
 }
 
 bool aabb::overlap(const aabb& other) const
@@ -30,26 +36,6 @@ bool aabb::inside(const aabb& other) const
 	return overlap(other.min) && overlap(other.max);
 }
 
-aabb phesycs_impl::get_collider_aabb(peetcs::archetype_pool& pool, const phesycs_impl::box_collider_data& collider_a, const pipo::transform_data& transform_a)
-{
-	pipo::transform_data collider_transform = collider_a.transform;
-
-	glm::mat4 translation = glm::translate(glm::mat4(1.0f), transform_a.get_pos());
-	glm::mat4 scale_mat = glm::scale(glm::mat4(1.0f), transform_a.get_scale());
-
-	glm::mat4 ws_matrix = translation * scale_mat;
-
-	aabb a_aabb = {};
-	auto collider_matrix = ws_matrix * collider_transform.get_local_space();
-	a_aabb.min = glm::vec3(collider_matrix * glm::vec4(collider_transform.get_pos() + collider_a.transform.get_scale() * -1.f, 1.f) );
-	a_aabb.max = glm::vec3(collider_matrix * glm::vec4(collider_transform.get_pos() + collider_a.transform.get_scale() * 1.f, 1.f));
-
-	if (a_aabb.min.x > a_aabb.max.x) std::swap(a_aabb.min.x, a_aabb.max.x);
-	if (a_aabb.min.y > a_aabb.max.y) std::swap(a_aabb.min.y, a_aabb.max.y);
-	if (a_aabb.min.z > a_aabb.max.z) std::swap(a_aabb.min.z, a_aabb.max.z);
-
-	return a_aabb;
-}
 
 // ======================= GJK =============================
 
@@ -72,12 +58,14 @@ struct simplex
 			return;
 		}
 
-		points[size] = point;
+		points = { point, points[0], points[1], points[2] };
 		size++;
 	}
 };
 
-static inline glm::vec3 furthest_point_in_direction(const std::vector<glm::vec3>& shape, glm::vec3 dir)
+
+template<typename It>
+static inline glm::vec3 furthest_point_in_direction(const It& shape, glm::vec3 dir)
 {
 	float max_dot = -INFINITY;
 	glm::vec3 max_point = { 0,0,0 };
@@ -94,7 +82,8 @@ static inline glm::vec3 furthest_point_in_direction(const std::vector<glm::vec3>
 	return max_point;
 }
 
-static inline support support_full(const std::vector<glm::vec3>& a, const std::vector<glm::vec3>& b, glm::vec3& dir)
+template<typename ItA, typename ItB>
+static inline support support_full(const ItA& a, const ItB& b, glm::vec3& dir)
 {
 	glm::vec3 point_a = furthest_point_in_direction(a, dir);
 	glm::vec3 point_b = furthest_point_in_direction(b, -dir);
@@ -114,97 +103,129 @@ static inline glm::vec3 get_origin_dir(glm::vec3& a, glm::vec3& b)
 	return glm::cross(glm::cross(ab, ao), ab);
 }
 
-static inline bool handle_simplex(simplex& simplex, glm::vec3& direction) {
-	if (simplex.size == 2) 
+static glm::vec3 triple_product(const glm::vec3& a, glm::vec3 b, glm::vec3 c)
+{
+	return glm::cross(glm::cross(a, b), c);
+}
+
+static bool handle_line(simplex& simplex, glm::vec3& direction)
+{
+	auto a = simplex.points[0].c;
+	auto b = simplex.points[1].c;
+
+	auto ab = b - a;
+	auto ao = -a;
+
+	if (glm::dot(ab, ao) > 0)
 	{
-		direction = get_origin_dir(simplex.points[1].c, simplex.points[0].c);
-		return false;
+		direction = triple_product(ab, ao, ab);
 	}
-	else if (simplex.size == 3) 
+	else
 	{
-		auto a = simplex.points[2].c;
-		auto b = simplex.points[1].c;
-		auto c = simplex.points[0].c;
+		simplex = { simplex.points[0] };
+		direction = ao;
+	}
 
-		auto ao = -a;
+	return false;
+}
 
-		auto abp = get_origin_dir(a, b);
-		if (!same_direction(abp, ao))
+static bool handle_triangle(simplex& simplex, glm::vec3& direction)
+{
+	auto a = simplex.points[0].c;
+	auto b = simplex.points[1].c;
+	auto c = simplex.points[2].c;
+
+	auto ab = b - a;
+	auto ac = c - a;
+	auto ao = -a;
+
+	// Get triangle normal
+	glm::vec<3, float> abc = glm::cross(ab, ac);
+	if (glm::dot(glm::cross(abc, ac), ao) > 0)
+	{
+		if (glm::dot(ac, ao) > 0)
 		{
-			simplex.points = { b, a };
+			simplex = { simplex.points[0], simplex.points[2] }; // a - c
 			simplex.size = 2;
-			direction = abp;
-			return false;
-		}
-
-		auto acp = get_origin_dir(a, c);
-		if (!same_direction(acp, ao))
-		{
-			simplex.points = { c, a };
-			simplex.size = 2;
-			direction = acp;
-			return false;
-		}
-
-		glm::vec<3, float> normal;
-		auto ab = b - a;
-		auto ac = c - a;
-		normal = glm::cross(ab, ac);
-
-		if (same_direction(normal, ao))
-		{
-			direction = normal;
+			direction = triple_product(ac, ao, ac);
 		}
 		else
 		{
-			direction = -normal;
-			std::swap(simplex.points[0], simplex.points[1]); // maintain winding
+			simplex = { simplex.points[0], simplex.points[1] }; // a - b
+			simplex.size = 2;
+			return handle_line(simplex, direction);
 		}
-		return false;
 	}
-	else if (simplex.size == 4) 
+	else
 	{
-		auto a = simplex.points[3].c;
-		auto b = simplex.points[2].c;
-		auto c = simplex.points[1].c;
-		auto d = simplex.points[0].c;
+		if (glm::dot(glm::cross(ab, abc), ao) > 0)
+		{
+			simplex = { simplex.points[0], simplex.points[1] }; // a - b
+			simplex.size = 2;
+			return handle_line(simplex, direction);
+		}
+
+		if (glm::dot(abc, ao) > 0)
+		{
+			direction = abc;
+		}
+		else
+		{
+			simplex = { simplex.points[0], simplex.points[2], simplex.points[1] }; // a - c - b
+			simplex.size = 3;
+			direction = -abc;
+		}
+	}
+
+	return false;
+}
+
+
+
+static inline bool handle_simplex(simplex& simplex, glm::vec3& direction)
+{
+	if (simplex.size == 2)
+	{
+		return handle_line(simplex, direction);
+	}
+	else if (simplex.size == 3)
+	{
+		return handle_triangle(simplex, direction);
+	}
+	else if (simplex.size == 4)
+	{
+		auto a = simplex.points[0].c;
+		auto b = simplex.points[1].c;
+		auto c = simplex.points[2].c;
+		auto d = simplex.points[3].c;
 
 		auto ao = -a;
-
 		auto ab = b - a;
 		auto ac = c - a;
 		auto ad = d - a;
 
 		auto abc = glm::cross(ab, ac);
-		if (glm::dot(abc, ao) > 0) abc = -abc;
-
 		auto acd = glm::cross(ac, ad);
-		if (glm::dot(acd, ao) > 0) acd = -acd;
-
 		auto adb = glm::cross(ad, ab);
-		if (glm::dot(adb, ao) > 0) adb = -adb;
 
-		if (same_direction(abc, ao)) 
+		if (same_direction(abc, ao))
 		{
-			simplex = { simplex.points[3], simplex.points[2], simplex.points[1] }; // a, b, c
+			simplex = { simplex.points[0], simplex.points[1], simplex.points[2] }; // a, b, c
 			simplex.size = 3;
-			direction = abc;
-			return false;
+			return handle_triangle(simplex, direction);
 		}
 
-		if (same_direction(acd, ao)) 
+		if (same_direction(acd, ao))
 		{
-			simplex = { simplex.points[3], simplex.points[1], simplex.points[0] }; // a, c, d
+			simplex = { simplex.points[0], simplex.points[2], simplex.points[3] }; // a, c, d
 			simplex.size = 3;
-			direction = acd;
-			return false;
+			return handle_triangle(simplex, direction);
 		}
-		if (same_direction(adb, ao)) 
+		if (same_direction(adb, ao))
 		{
-			simplex = { simplex.points[3], simplex.points[0], simplex.points[2] }; // a, d, b
+			simplex = { simplex.points[0], simplex.points[3], simplex.points[1] }; // a, d, b
 			simplex.size = 3;
-			direction = adb;
-			return false;
+			return handle_triangle(simplex, direction);
 		}
 
 		return true;
@@ -213,19 +234,20 @@ static inline bool handle_simplex(simplex& simplex, glm::vec3& direction) {
 	return false;
 }
 
-static bool gjk(const std::vector<glm::vec3>& a, const std::vector<glm::vec3>& b, simplex& simplex)
+template<typename ItA, typename ItB>
+static bool gjk(const ItA& a, const ItB& b, simplex& simplex)
 {
 	glm::vec3 dir = glm::vec3(1, 0, 0);
 	simplex.add(support_full(a, b, dir));
 
 	dir = -simplex.points[0].c;
 
-	for (int i =0; i < 5; i++) 
+	for (int i = 0; i < 10; i++)
 	{
 		dir = glm::normalize(dir);
 
 		support new_pt = support_full(a, b, dir);
-		if (glm::dot(new_pt.c, dir) < 0)
+		if (glm::dot(new_pt.c, dir) <= 0)
 			return false;
 
 		simplex.add(new_pt);
@@ -266,7 +288,7 @@ face make_face(int a, int b, int c, const std::vector<support>& polytope)
 	return face{ a, b, c, normal, distance };
 }
 
-void add_edge(int a, int b, std::vector<edge>&edge_list)
+void add_edge(int a, int b, std::vector<edge>& edge_list)
 {
 	edge e{ a, b };
 	auto it = std::find(edge_list.begin(), edge_list.end(), e);
@@ -282,13 +304,44 @@ void add_edge(int a, int b, std::vector<edge>&edge_list)
 	}
 };
 
-collision_test epa(const std::vector<glm::vec3>& a, const std::vector<glm::vec3>& b, simplex& simplex)
+
+static glm::vec3 compute_worldspace_collision(const support& A, const support& B, const support& C, const support& P)
+{
+	// From: https://gamedev.stackexchange.com/a/23745
+
+	// First calculate barycentric coordinates for support point P
+	glm::vec3 v0 = B.c - A.c;
+	glm::vec3 v1 = C.c - A.c;
+	glm::vec3 v2 = P.c - A.c;
+
+	float d00 = glm::dot(v0, v0);
+	float d01 = glm::dot(v0, v1);
+	float d11 = glm::dot(v1, v1);
+	float d20 = glm::dot(v2, v0);
+	float d21 = glm::dot(v2, v1);
+
+	float denom = d00 * d11 - d01 * d01;
+	float v = (d11 * d20 - d01 * d21) / denom;
+	float w = (d00 * d21 - d01 * d20) / denom;
+	float u = 1.0f - v - w;
+
+	// Transform barycoords to ws
+	glm::vec3 contactA = u * A.a + v * B.a + w * C.a;
+	return contactA;
+}
+
+
+template<int ASize, int BSize, typename ItA, typename ItB>
+collision_test epa(const ItA& a, const ItB& b, simplex& simplex)
 {
 	collision_test result;
 
 	// TODO use something more cache efficient than a vector (as well for the edge list)
 	std::vector<support> polytope;
 	std::vector<face> faces;
+
+	polytope.reserve(ASize * BSize);
+	faces.reserve(ASize * BSize);
 
 	for (int i = 0; i < simplex.size; ++i) {
 		polytope.push_back(simplex.points[i]);
@@ -300,13 +353,15 @@ collision_test epa(const std::vector<glm::vec3>& a, const std::vector<glm::vec3>
 	faces.push_back(make_face(0, 3, 1, polytope));
 	faces.push_back(make_face(1, 3, 2, polytope));
 
+	int max_attemps = ASize * BSize;
+
 	// hardcoded out but there should be a mathematical way to approach this.
-	for (int attempts = 0; attempts < 30; attempts++)
+	for (int attempts = 0; attempts <= max_attemps; attempts++)
 	{
 		// Find face closest to origin along normal
 		int closest = -1;
 		float min_dist = FLT_MAX;
-		for (int i = 0; i < (int)faces.size(); ++i) 
+		for (int i = 0; i < (int)faces.size(); ++i)
 		{
 			// NAN check
 			if (faces[i].distance != faces[i].distance)
@@ -321,6 +376,11 @@ collision_test epa(const std::vector<glm::vec3>& a, const std::vector<glm::vec3>
 			}
 		}
 
+		if (closest == -1)
+		{
+			return {};
+		}
+
 		face& f = faces[closest];
 		support p = support_full(a, b, f.normal);
 
@@ -333,7 +393,7 @@ collision_test epa(const std::vector<glm::vec3>& a, const std::vector<glm::vec3>
 			glm::vec3 contactB = p.b;
 
 			result.collision = true;
-			result.position = contactA - f.normal * (d * 0.5f);
+			result.position = compute_worldspace_collision(polytope[f.a], polytope[f.b], polytope[f.c], p);
 			result.axis = f.normal;
 			result.resolution = d;
 
@@ -343,16 +403,16 @@ collision_test epa(const std::vector<glm::vec3>& a, const std::vector<glm::vec3>
 		std::vector<edge> edge_list;
 
 		// Remove faces visible from p and collect their edges
-		for (int i = 0; i < (int)faces.size(); ) 
+		for (int i = 0; i < (int)faces.size(); )
 		{
-			if (glm::dot(faces[i].normal, p.c - polytope[faces[i].a].c) > 0) 
+			if (glm::dot(faces[i].normal, p.c - polytope[faces[i].a].c) > 0)
 			{
 				add_edge(faces[i].a, faces[i].b, edge_list);
 				add_edge(faces[i].b, faces[i].c, edge_list);
 				add_edge(faces[i].c, faces[i].a, edge_list);
 				faces.erase(faces.begin() + i);
 			}
-			else 
+			else
 			{
 				++i;
 			}
@@ -362,13 +422,12 @@ collision_test epa(const std::vector<glm::vec3>& a, const std::vector<glm::vec3>
 		int idx = (int)polytope.size() - 1;
 
 		// Rebuild polytope with new faces from border edges
-		for (auto& e : edge_list) 
+		for (auto& e : edge_list)
 		{
 			faces.push_back(make_face(e.a, e.b, idx, polytope));
 		}
 	}
 
-	result.collision = false;
 	return result;
 }
 
@@ -376,7 +435,7 @@ collision_test epa(const std::vector<glm::vec3>& a, const std::vector<glm::vec3>
 void resolve_3d_collision(phesycs_impl::rigid_body_data& a, phesycs_impl::rigid_body_data& b, const collision_test& collision)
 {
 	float elasticity = 0.5;
-	float friction = 0.0f;
+	float friction = 0.01f;
 
 	glm::vec3 ra = collision.position - phesycs_impl::to_vec3(a.transform.position);
 	glm::vec3 rb = collision.position - phesycs_impl::to_vec3(b.transform.position);
@@ -394,11 +453,11 @@ void resolve_3d_collision(phesycs_impl::rigid_body_data& a, phesycs_impl::rigid_
 	if (vel_along_normal > 0.0f)
 		return;
 
-	auto inv_tern_a = a.is_static ? glm::mat3(0.0f) : a.get_inverse_inertia();
-	auto inv_tern_b = b.is_static ? glm::mat3(0.0f) : b.get_inverse_inertia();
+	auto inv_tern_a = a.is_static ? glm::mat3(0) : a.get_inverse_inertia();
+	auto inv_tern_b = b.is_static ? glm::mat3(0) : b.get_inverse_inertia();
 
-	float denom = 
-		(a.is_static ? 0.f : a.inverse_mass) + 
+	float denom =
+		(a.is_static ? 0.f : a.inverse_mass) +
 		(b.is_static ? 0.f : b.inverse_mass) + glm::dot(collision.axis,
 			glm::cross(inv_tern_a * glm::cross(ra, normal), ra) +
 			glm::cross(inv_tern_b * glm::cross(rb, normal), rb));
@@ -422,22 +481,180 @@ void resolve_3d_collision(phesycs_impl::rigid_body_data& a, phesycs_impl::rigid_
 	}
 
 	// Friction
-	//float a_friction = friction * (1.f - abs(glm::dot(glm::normalize(impulse), glm::normalize(a.get_velocity()))));
-	a.set_translational_velocity(a.get_velocity() * (1.f - friction));
-	//a.set_angular_velocity(a.get_angular_velocity() * (1.f - friction));
+	/*if (!a.is_static)
+	{
+		float a_friction = friction * (1.f - abs(glm::dot(glm::normalize(impulse), glm::normalize(a.get_velocity()))));
+		float a_angular_friction = friction * (1.f - abs(glm::dot(glm::normalize(impulse), glm::normalize(a.get_angular_velocity()))));
+		a.set_translational_velocity(a.get_velocity() * (1.f - a_friction));
+		a.set_angular_velocity(a.get_angular_velocity() * (1.f - a_angular_friction));
+	}
 
-	//float b_friction = friction * (1.f - abs(glm::dot(glm::normalize(impulse), glm::normalize(b.get_velocity()))));
-	b.set_translational_velocity(b.get_velocity() * (1.f - friction));
-	//b.set_angular_velocity(b.get_angular_velocity() * (1.f - friction));
+	if (!b.is_static)
+	{
+		float b_friction = friction * (1.f - abs(glm::dot(glm::normalize(impulse), glm::normalize(b.get_velocity()))));
+		float b_angular_friction = friction * (1.f - abs(glm::dot(glm::normalize(impulse), glm::normalize(b.get_angular_velocity()))));
+		b.set_translational_velocity(b.get_velocity() * (1.f - b_friction));
+		b.set_angular_velocity(b.get_angular_velocity() * (1.f - b_angular_friction));
+	}*/
 }
 
+static void update_collider_data(peetcs::archetype_pool& pool, phesycs_impl::box_collider_data& collider, pipo::transform_data& transform)
+{
+	auto a_ws_matrix = collider.transform.get_local_space() * transform.get_world_space(pool);
+	collider.vertices = pipo::primitives::cube::vertices;
 
-void phesycs_impl::tick(peetcs::archetype_pool& pool, pipo& gpu_context)
+	collider.aabb.min = glm::vec3(INFINITY);
+	collider.aabb.max = glm::vec3(-INFINITY);
+
+	for (auto& a_vertex : collider.vertices)
+	{
+		a_vertex = a_ws_matrix * glm::vec4(a_vertex, 1);
+		collider.aabb.max = glm::max(collider.aabb.max, a_vertex);
+		collider.aabb.min = glm::min(collider.aabb.min, a_vertex);
+	}
+}
+
+struct collision_pair {
+	int a_id;
+	int b_id;
+
+	inline bool operator==(const collision_pair& other) const {
+		return (a_id == other.a_id && b_id == other.b_id) ||
+			(a_id == other.b_id && b_id == other.a_id);
+	}
+};
+
+// Hash functor with symmetric hashing
+struct collision_pair_hash {
+	std::size_t operator()(const collision_pair& cp) const {
+		// Compute symmetric hash (independent of order)
+		int h1 = std::hash<int>{}(cp.a_id);
+		int h2 = std::hash<int>{}(cp.b_id);
+		// Combine in a way that's symmetric
+		return h1 ^ h2;
+	}
+};
+
+static bool is_pair_checked(std::unordered_set<collision_pair>& pairs, collision_pair pair)
+{
+	bool stop = false;
+
+
+	return false;
+}
+
+void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& gpu_context)
+{
+	auto query = pool.query<pipo::transform_data, box_collider_data, rigid_body_data>();
+	
+	std::unordered_set<collision_pair, collision_pair_hash> pairs = {};
+
+	int max_id = -1;
+	int a_id = -1;
+
+	for (auto body_a : query)
+	{
+		box_collider_data& collider_a = body_a.get<box_collider_data>();
+		pipo::transform_data& transform_a = body_a.get<pipo::transform_data>();
+
+		if (transform_a.parent == peetcs::invalid_entity_id)
+		{
+			a_id++;
+			max_id = std::max(max_id, a_id);
+
+			if (a_id == max_id)
+			{
+				update_collider_data(pool, collider_a, transform_a);
+			}
+
+
+			int b_id = -1;
+			for (auto body_b : query)
+			{
+				b_id++;
+				max_id = std::max(max_id, b_id);
+
+				// skip self check 
+				if (a_id == b_id)
+				{
+					continue;
+				}
+
+				collision_pair pair = { a_id, b_id };
+				if (pairs.contains(pair))
+					continue;
+
+
+				// Is not a child transform (not yet supported)
+				pipo::transform_data& transform_b = body_b.get<pipo::transform_data>();
+				if (transform_b.parent != peetcs::invalid_entity_id)
+				{
+					continue;
+				}
+
+				box_collider_data& collider_b = body_b.get<box_collider_data>();
+				if (b_id == max_id)
+				{
+					update_collider_data(pool, collider_b, transform_b);
+				}
+
+				if (!collider_a.aabb.overlap(collider_b.aabb))
+				{
+					continue;
+				}
+				//gpu_context.draw_aabb(collider_a.aabb.min, collider_a.aabb.max, { 0, 1, 0 });
+
+				collision_test test = {};
+				simplex in_simplex = {};
+				if (gjk(collider_a.vertices, collider_b.vertices, in_simplex))
+				{
+					test = epa<8,8>(collider_a.vertices, collider_b.vertices, in_simplex);
+					test.collision = true;
+
+					//gpu_context.draw_cube_gizmo(test.position, { 0.1,0.1,0.1 }, glm::angleAxis(1.f, test.axis), { 1,0,0 });
+
+					pairs.emplace(pair);
+				}
+
+				if (test.collision)
+				{
+					float resolve_amount = 0.5f;
+
+					rigid_body_data& a_rigidbody = body_a.get<rigid_body_data>();
+					rigid_body_data& b_rigidbody = body_b.get<rigid_body_data>();
+
+					//gpu_context.draw_aabb(a_aabb.min, a_aabb.max, { 0,0,1 });
+
+					if (!a_rigidbody.is_static && !b_rigidbody.is_static)
+					{
+						transform_a.set_pos(transform_a.get_pos() + test.axis * test.resolution * -resolve_amount);
+						transform_b.set_pos(transform_b.get_pos() + test.axis * test.resolution * resolve_amount);
+					}
+					else if (!a_rigidbody.is_static)
+					{
+						transform_a.set_pos(transform_a.get_pos() + test.axis * test.resolution * -resolve_amount);
+						update_collider_data(pool, collider_a, transform_a);
+					}
+					else if (!b_rigidbody.is_static)
+					{
+						transform_b.set_pos(transform_b.get_pos() + test.axis * test.resolution * resolve_amount);
+						update_collider_data(pool, collider_b, transform_b);
+
+					}
+
+					resolve_3d_collision(a_rigidbody, b_rigidbody, test);
+				}
+			}
+		}
+	}
+}
+
+void phesycs_impl::tick_integration(peetcs::archetype_pool& pool, pipo& gpu_context)
 {
 	static time_info time;
 
 	time.tick();
-	time.delta_time *= 1.f;
+	time.delta_time *= 1.0f;
 
 	auto query = pool.query<pipo::transform_data, box_collider_data, rigid_body_data>();
 
@@ -476,171 +693,4 @@ void phesycs_impl::tick(peetcs::archetype_pool& pool, pipo& gpu_context)
 			rigid_body.set_translational_velocity(rigid_body.get_velocity() + glm::vec3(0, -9.81f * (float)time.delta_time, 0));
 		}
 	}
-
-	struct collision_pair
-	{
-		int a_id;
-		int b_id;
-
-		inline bool operator==(const collision_pair& other) const
-		{
-			return a_id == other.b_id && b_id == other.a_id || a_id == other.a_id && b_id == other.b_id;
-		}
-	};
-	std::vector<aabb> aabbs = {};
-	std::vector<collision_pair> pairs = {};
-
-	int a_id = -1;
-	for (auto body_a : query)
-	{
-		box_collider_data collider_a = body_a.get<box_collider_data>();
-		pipo::transform_data& transform_a = body_a.get<pipo::transform_data>();
-
-		if (transform_a.parent == peetcs::invalid_entity_id)
-		{
-			a_id++;
-			aabb a_aabb;
-			if (aabbs.size() <= a_id)
-			{
-				a_aabb = get_collider_aabb(pool, collider_a, transform_a);
-				aabbs.push_back(a_aabb);
-			}
-			else
-			{
-				a_aabb = aabbs[a_id];
-			}
-
-			int b_id = -1;
-			for (auto body_b : query)
-			{
-				b_id++;
-
-				collision_pair pair = { a_id, b_id };
-				bool stop = false;
-				for (auto old_pair : pairs)
-				{
-					if (old_pair == pair)
-					{
-						stop = true;
-						break;
-					}
-				}
-
-				if (stop)
-				{
-					continue;
-				}
-
-
-				if (body_a.region.get_id() == body_b.region.get_id())
-				{
-					continue;
-				}
-
-				pipo::transform_data& transform_b = body_b.get<pipo::transform_data>();
-
-				if (transform_b.parent != peetcs::invalid_entity_id)
-				{
-					continue;
-				}
-
-				box_collider_data& collider_b = body_b.get<box_collider_data>();
-				aabb b_aabb;
-				if (aabbs.size() <= b_id)
-				{
-					b_aabb = get_collider_aabb(pool, collider_b, transform_b);
-					aabbs.push_back(b_aabb);
-				}
-				else
-				{
-					b_aabb = aabbs[b_id];
-				}
-
-				if (!a_aabb.overlap(b_aabb))
-				{
-					continue;
-				}
-
-				pairs.push_back(pair);
-
-				// TODO these can be arrays
-				std::vector<glm::vec3> a_vertices = pipo::primitives::cube::vertices;
-				std::vector<glm::vec3> b_vertices = pipo::primitives::cube::vertices;
-
-				std::vector<glm::vec3> a_axes = { {0,0,1}, {0,1,0}, {1,0,0} };
-				std::vector<glm::vec3> b_axes = { {0,0,1}, {0,1,0}, {1,0,0} };
-
-				auto a_ws_matrix = collider_a.transform.get_local_space() * transform_a.get_world_space(pool) ;
-				auto b_ws_matrix = collider_b.transform.get_local_space()*  transform_b.get_world_space(pool) ;
-
-				// Assume shape that the shape is a cube for now
-				for (auto& a_vertex : a_vertices)
-				{
-					a_vertex =  a_ws_matrix * glm::vec4(a_vertex, 1);
-				}
-
-				for (auto& b_vertex : b_vertices)
-				{
-					b_vertex = b_ws_matrix * glm::vec4(b_vertex, 1);
-				}
-
-				auto a_rot_matrix = glm::toMat4(transform_a.get_rotation());
-				auto b_rot_matrix = glm::toMat4(transform_b.get_rotation());
-
-				for (auto& a_axis : a_axes)
-				{
-					a_axis = a_rot_matrix * glm::vec4(a_axis, 1);
-				}
-
-				for (auto& b_axis : b_axes)
-				{
-					b_axis = b_rot_matrix * glm::vec4(b_axis, 1);
-				}
-
-				collision_test test = {};
-				simplex in_simplex = {};
-				if (gjk(a_vertices, b_vertices, in_simplex))
-				{
-					test = epa(a_vertices, b_vertices, in_simplex);
-				}
-
-				if (test.collision)
-				{
-					float resolve_amount = 0.04f;
-					//gpu_context.draw_cube_gizmo(test.position, { 0.01, 0.01, 0.01 }, { 0,0,0,1}, { 1,0,0 });
-					//gpu_context.draw_line_gizmo(a_aabb.min, a_aabb.max, { 1,1,0 });
-
-
-					rigid_body_data& a_rigidbody = body_a.get<rigid_body_data>();
-					rigid_body_data& b_rigidbody = body_b.get<rigid_body_data>();
-
-					if (a_rigidbody.is_static)
-						gpu_context.draw_cube_gizmo(transform_a.get_pos(), transform_a.get_scale() * collider_a.transform.get_scale(), transform_a.get_rotation(), { 0, 1, 0 });
-
-					if (b_rigidbody.is_static)
-						gpu_context.draw_cube_gizmo(transform_b.get_pos(), transform_b.get_scale() * collider_b.transform.get_scale(), transform_b.get_rotation(), { 0, 1, 0 });
-
-
-					if (!a_rigidbody.is_static && !b_rigidbody.is_static)
-					{
-						transform_a.set_pos(transform_a.get_pos() + test.axis * test.resolution * -resolve_amount);
-						transform_b.set_pos(transform_b.get_pos() + test.axis * test.resolution * resolve_amount);
-					}
-					else if (!a_rigidbody.is_static)
-					{
-						transform_a.set_pos(transform_a.get_pos() + test.axis * test.resolution * -resolve_amount);
-					}
-					else if (!b_rigidbody.is_static)
-					{
-						transform_b.set_pos(transform_b.get_pos() + test.axis * test.resolution * resolve_amount);
-					}
-
-					a_aabb = get_collider_aabb(pool, collider_a, transform_a);
-					aabbs[a_id] = a_aabb;
-					resolve_3d_collision(a_rigidbody, b_rigidbody, test);
-				}
-			}
-		}
-	}
-
 }

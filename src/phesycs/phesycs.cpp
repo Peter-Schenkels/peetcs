@@ -334,7 +334,7 @@ static glm::vec3 compute_worldspace_collision(const support& A, const support& B
 template<int ASize, int BSize, typename ItA, typename ItB>
 collision_test epa(const ItA& a, const ItB& b, simplex& simplex)
 {
-	collision_test result;
+	collision_test result = {};
 
 	// TODO use something more cache efficient than a vector (as well for the edge list)
 	std::vector<support> polytope;

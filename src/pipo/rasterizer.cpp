@@ -383,21 +383,27 @@ glm::mat4 get_model(const pipo::transform_data& transform)
     return model_matrix;
 }
 
+void pipo::start_imgui()
+{
+	// Start the ImGui frame
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+}
+
+void pipo::end_imgui()
+{
+	// Render
+	ImGui::Render();
+}
+
 void pipo::render_imgui(peetcs::archetype_pool& pool, std::vector<std::shared_ptr<gui_interface>> guis)
 {
-    // Start the ImGui frame
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
 	// GUI Content
     for (const auto& gui : guis)
     {
         gui->draw(pool);
     }
-
-	// Render
-	ImGui::Render();
 }
 
 bool pipo::start_frame()
@@ -514,7 +520,7 @@ void pipo::render_meshes(peetcs::archetype_pool& pool)
 
         if (!camera.active)
         {
-            return;
+            continue;
         }
 
         if (camera.render_target == render_target_id{})

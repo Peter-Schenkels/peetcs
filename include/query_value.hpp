@@ -15,5 +15,10 @@ namespace peetcs
 		{
 			return region.get<Component>();
 		}
+
+		[[nodiscard]] element_layout::id_t get_id() const
+		{
+			return region.get_id();
+		}
 	};
 }

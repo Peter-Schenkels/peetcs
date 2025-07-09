@@ -84,8 +84,34 @@ int main()
 		}
 
 		// Setup entities
-		peetcs::entity_id triangle = 2;
+
 		peetcs::entity_id camera = 1;
+		{
+			for (int i = 0; i <2; i++)
+			// Setup camera entity
+			{
+				pipo::camera_data& camera_data = pool.add<pipo::camera_data>(camera);
+				pipo::transform_data& camera_transform = pool.add<pipo::transform_data>(camera);
+				camera_transform.set_pos(0, 10, 10);
+				camera_transform.set_rotation(-3.1415 / 4, 0, 0);
+
+				camera_data.c_near = 0.1f;
+				camera_data.c_far = 1000.0f;
+				camera_data.aspect = 1920.f / 1080;
+				camera_data.fov = 40.0f;
+				camera_data.type = pipo::view_type::perspective;
+				camera_data.active = i == 0;
+				camera_data.render_target = main_render_target;
+
+				pool.emplace_commands();
+
+				camera++;
+			}
+		}
+
+
+
+		peetcs::entity_id triangle = camera + 1;
 
 		{
 			int start_entity = triangle;
@@ -132,23 +158,7 @@ int main()
 				pool.emplace_commands();
 			}
 
-			// Setup camera entity
-			{
-				pipo::camera_data& camera_data = pool.add<pipo::camera_data>(camera);
-				pipo::transform_data& camera_transform = pool.add<pipo::transform_data>(camera);
-				camera_transform.set_pos(0, 10,  10);
-				camera_transform.set_rotation(-3.1415 / 4, 0, 0);
 
-				camera_data.c_near = 0.1f;
-				camera_data.c_far = 1000.0f;
-				camera_data.aspect = 1920.f / 1080;
-				camera_data.fov = 40.0f;
-				camera_data.type = pipo::view_type::perspective;
-				camera_data.active = true;
-				camera_data.render_target = main_render_target;
-
-				pool.emplace_commands();
-			}
 		}
 
 
@@ -246,25 +256,65 @@ int main()
 	// Do game ticks
 	while (rasterizer.start_frame())
 	{
-
+		rasterizer.start_imgui();
 		rasterizer.render_imgui(pool, debug_guis);
-		rasterizer.render_frame(pool);
+
 		time.tick();
 
+
+		json json = {};
 		auto platform_query = pool.query<platform_data, pipo::transform_data>();
 		for (auto query_value : platform_query)
 		{
 			auto& transform = query_value.get<pipo::transform_data>();
+
+			std::string name_str("Platform: " + std::to_string(query_value.get_id()));
+			const char* name = name_str.c_str();
+
+			draw_imgui_editable(name,
+				"position", transform.position,
+				"rotation", transform.rotation,
+				"scale", transform.scale,
+				"parent", transform.parent);
 
 			glm::quat rotation = transform.get_rotation();
 
 			transform.set_rotation(glm::angleAxis((float)fmod(glm::angle(rotation) +  time.get_delta_time() * 0.3, std::numbers::pi), glm::vec3{0.f,-1.f,0.f } ));
 		}
 
+
+		auto camera_query = pool.query<pipo::camera_data, pipo::transform_data>();
+		for (auto query_value : camera_query)
+		{
+			auto name_str = "Camera" + std::string{ (char)query_value.get_id() };
+
+			ImGui::Begin(name_str.c_str());
+			auto& camera = query_value.get<pipo::camera_data>();
+			auto& transform = query_value.get<pipo::transform_data>();
+
+			draw_imgui_editable("Transform",
+				"position", transform.position,
+				"rotation", transform.rotation,
+				"scale", transform.scale);
+
+			draw_imgui_editable("Camera",
+				"active", camera.active,
+				"fov", camera.fov,
+				"c_near", camera.c_near,
+				"c_far", camera.c_far,
+				"aspect", camera.aspect);
+			ImGui::End();
+		}
+
+
 		if (phesycs::loaded)
 		{
 			phesycs::tick(pool, rasterizer);
 		}
+
+		rasterizer.end_imgui();
+		rasterizer.render_frame(pool);
+
 	}
 
 	// Exit

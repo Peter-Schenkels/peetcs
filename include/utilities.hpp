@@ -1,7 +1,10 @@
 #pragma once
 #include <chrono>
+#include <string>
 
 #include "pipo/imgui.hpp"
+#include <nlohmann/json.hpp>
+#include <type_traits>
 
 struct time_info
 {
@@ -46,3 +49,87 @@ struct time_info
 		return std::chrono::duration<double>(current_time - last_tick_time);
 	}
 };
+
+
+using json = nlohmann::json;
+
+template<typename Arg, typename...Args>
+void to_json_value(json& out, Arg& arg, Args&... args)
+{
+	if constexpr (requires { out = arg; })
+	{
+		out = arg;
+	}
+
+	if constexpr (sizeof ...(Args) == 0)
+	{
+		return;
+	}
+}
+
+template<typename Arg, typename...Args>
+void to_json(json& out, Arg& arg, Args&... args)
+{
+	if constexpr (sizeof ...(Args) == 0)
+	{
+		return;
+	}
+	else
+	{
+		if constexpr (std::is_constructible_v<std::string, Arg>)
+		{
+			to_json_value(out[arg], args...);
+		}
+
+		to_json(out, args...);
+	}
+}
+
+template<typename Arg, typename...Args>
+void from_json_value(json& in, Arg& arg, Args&... args)
+{
+	if (in.is_array())
+	{
+		int i = 0;
+		for (auto element : in)
+		{
+			if constexpr (requires { arg[i] = element; })
+			{
+				arg[i] = element;
+			}
+
+			i++;
+		}
+	}
+
+
+
+	else if constexpr (requires { arg = in.get_ptr<Arg>(); })
+	{
+		arg = in.get_ptr<Arg>();
+	}
+
+	if constexpr (sizeof ...(Args) == 0)
+	{
+		return;
+	}
+}
+
+
+template<typename Arg, typename...Args>
+void from_json(json& in, Arg& arg, Args&... args)
+{
+	if constexpr (sizeof ...(Args) == 0)
+	{
+		return;
+	}
+	else
+	{
+		if constexpr (std::is_constructible_v<std::string, Arg>)
+		{
+			from_json_value(in[arg], args...);
+		}
+
+		from_json(in, args...);
+	}
+}

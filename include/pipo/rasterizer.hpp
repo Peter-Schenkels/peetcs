@@ -346,6 +346,8 @@ public:
 	bool bind_render_target(const render_target_id id);
 	void unbind_render_target();
 
+	void start_imgui();
+	void end_imgui();
 	void render_imgui(peetcs::archetype_pool& pool, std::vector<std::shared_ptr<gui_interface>> guis);
 	bool start_frame();
 

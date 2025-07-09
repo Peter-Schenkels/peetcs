@@ -14,9 +14,11 @@ set (CMAKE_BUILD_TYPE "Release" CACHE
       STRING "Choose the type of build.")
 
 include(CMake/AddProjectMacro/Macros.cmake)
-###############################
-# Add all sources and headers #
-##############################
+
+# Add JSON libraries
+include(FetchContent)
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz)
+FetchContent_MakeAvailable(json)
 
 
 # FILE GROUP SRC_CMAKEGEN
@@ -79,7 +81,7 @@ set(SRC_LIB_PEETCS ${SRC_CMAKEGEN} ${SRC_INCLUDE} ${SRC_SRC} ${SRC_TESTS} )
 add_project(PEETCS
             STATIC_LIB
             SOURCES ${SRC_LIB_PEETCS}
-            DEPENDS )
+            DEPENDS nlohmann_json::nlohmann_json)
 
 # FILE GROUP SRC_PEETCS
 set(SRC_MAIN
@@ -123,11 +125,12 @@ link_directories(${CMAKE_SOURCE_DIR}/external/glew/lib/Release/x64)
 
 set(SRC_LIB_PIPO_RASTERIZER ${SRC_INCLUDE_PIPO_RASTERIZER} ${SRC_SRC_PIPO})
 
+
 # define the target
 add_project(PIPO
             STATIC_LIB 
             SOURCES ${SRC_LIB_PIPO_RASTERIZER}
-            DEPENDS PEETCS ${GLFW_LIB} glew32s opengl32 imgui)
+            DEPENDS PEETCS ${GLFW_LIB} glew32s opengl32 imgui nlohmann_json::nlohmann_json)
 
 			
 target_include_directories(PIPO PRIVATE external/glm external/stb external/obj_loader)
@@ -151,10 +154,10 @@ source_group("Phesycs" FILES ${SRC_PHESYCS})
 add_project(PHESYCS
             SHARED_LIB
             SOURCES ${SRC_PHESYCS}
-            DEPENDS PEETCS PIPO)
+            DEPENDS PEETCS PIPO nlohmann_json::nlohmann_json)
 
 # define the target
 add_project(TESTER
             GUI_APP 
             SOURCES ${SRC_MAIN}
-            DEPENDS PEETCS PIPO PHESYCS)
+            DEPENDS PEETCS PIPO PHESYCS nlohmann_json::nlohmann_json)

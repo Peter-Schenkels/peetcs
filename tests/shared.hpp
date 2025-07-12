@@ -41,6 +41,7 @@ struct phesycs
 	{
 		current_time.tick();
 
+		tick_spring_mass_integration_ptr(pool, gpu_context);
 		tick_integration_ptr(pool, gpu_context);
 
 		if (current_time.get_now() - time_since_last_tick > 1.f / 60.f)

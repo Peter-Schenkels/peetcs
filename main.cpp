@@ -183,8 +183,11 @@ int main()
 
 
 		for (int i = 1; i < 6; i++)
+		peetcs::entity_id platform = triangle;
+		for (int i = 1; i < 7; i++)
 		{
 			peetcs::entity_id platform = triangle + i;
+			platform = triangle + i;
 			pipo::mesh_renderer_data& platform_mesh_renderer = pool.add<pipo::mesh_renderer_data>(platform);
 
 			platform_mesh_renderer.visible = true;
@@ -197,6 +200,9 @@ int main()
 			platform_rigidbody.is_static = true;
 
 			phesycs_impl::box_collider_data& platform_collider = pool.add<phesycs_impl::box_collider_data>(platform);
+			platform_collider.transform = {};
+
+			platform_rigidbody.set_mass(100, platform_collider);
 
 			float scale = 1.f;
 			platform_collider.transform.set_scale(scale, scale, scale);
@@ -247,19 +253,67 @@ int main()
 			else if (i == 5)
 			{
 				platform_mesh_renderer.mesh_id = rasterizer.get_cube();
-				platform_transform.set_scale(10, 2, 1);
-				platform_transform.set_pos(0, -3, -15);
+				platform_transform.set_scale(1, 0.5f, 0.1f);
+				platform_transform.set_pos(0, -0, 1.1f);
 				platform_transform.set_rotation(0, 0, 0);
 				//platform_rigidbody.is_static = false;
 				//platform_rigidbody.set_mass(100000.f, platform_collider);
 				continue;;
 
+				platform_transform.parent = platform - 2;
+				material.main_texture = cube_texture;
 			}
-
-
 
 			pool.emplace_commands();
 		}
+
+
+
+
+
+		peetcs::entity_id cable = platform;
+		for (int i = 1; i < 25; i++)
+		{
+			cable = platform + i;
+			pipo::mesh_renderer_data& cable_mesh_renderer = pool.add<pipo::mesh_renderer_data>(cable);
+			cable_mesh_renderer.visible = true;
+			cable_mesh_renderer.mesh = rasterizer.get_cube();
+
+			pipo::transform_data& cable_transform = pool.add<pipo::transform_data>(cable);
+			cable_transform.set_pos(-i, i, 0);
+			cable_transform.set_scale(0.3f, 0.3f, 0.3f);
+			cable_transform.set_rotation(0, 0, 0);
+
+			phesycs_impl::box_collider_data& cable_collider = pool.add<phesycs_impl::box_collider_data>(cable);
+			cable_collider.transform.set_pos(0, 0, 0);
+			cable_collider.transform.set_scale(1, 1, 1);
+			cable_collider.transform.set_rotation(0, 0, 0);
+
+			pipo::unlit_material_data& material = pool.add<pipo::unlit_material_data>(cable);
+			material.main_texture = background_texture;
+
+			phesycs_impl::rigid_body_data& cable_rigidbody = pool.add<phesycs_impl::rigid_body_data>(cable);
+			cable_rigidbody.set_mass(1, cable_collider);
+			cable_rigidbody.is_static = false;
+
+			phesycs_impl::spring_mass_data& spring_mass = pool.add<phesycs_impl::spring_mass_data>(cable);
+
+			if (i == 1)
+			{
+				spring_mass.b = platform - 1;
+			}
+			else
+			{
+				spring_mass.b = cable - 1;
+
+			}
+			spring_mass.damping = 10.f;
+			spring_mass.rest_length = 0.1f;
+			spring_mass.stiffness = 100.f;
+
+			pool.emplace_commands();
+		}
+
 	}
 
 	// Setup Debug imguis

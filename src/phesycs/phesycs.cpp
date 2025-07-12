@@ -431,9 +431,15 @@ collision_test epa(const ItA& a, const ItB& b, simplex& simplex)
 	return result;
 }
 
-
 void resolve_3d_collision(phesycs_impl::rigid_body_data& a, phesycs_impl::rigid_body_data& b, const collision_test& collision)
 {
+	if (glm::length(collision.axis) == 0.f)
+	{
+		return;
+	}
+
+
+
 	float elasticity = 0.5;
 	float friction = 0.01f;
 
@@ -688,6 +694,84 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 	}
 }
 
+
+void phesycs_impl::tick_spring_mass_integration(peetcs::archetype_pool& pool, pipo& gpu_context)
+{
+	static time_info time;
+
+	time.tick();
+	time.delta_time *= 1.0f;
+
+	auto query = pool.query<pipo::transform_data, rigid_body_data, spring_mass_data>();
+	for (auto query_value : query)
+	{
+
+		auto& spring_mass = query_value.get<spring_mass_data>();
+		auto& transform_a = query_value.get<pipo::transform_data>();
+		auto transform_b_ptr = pool.get_from_owner<pipo::transform_data>(spring_mass.b);
+		if (!transform_b_ptr)
+		{
+			continue;
+		}
+
+		// Check if B is still valid
+		auto* rigid_body_b_ptr = pool.get_from_owner<rigid_body_data>(spring_mass.b);
+		if (!rigid_body_b_ptr)
+		{
+			continue;
+		}
+
+		rigid_body_data& rigid_body_a = query_value.get<rigid_body_data>();
+		rigid_body_data& rigid_body_b = *rigid_body_b_ptr;
+
+		glm::vec3 a = transform_a.get_ws_pos(pool);
+		glm::vec3 b = transform_b_ptr->get_ws_pos(pool);
+
+		gpu_context.draw_cube_gizmo(a, { 0.1, 0.1, 0.1 }, rigid_body_a.transform.get_rotation(), { 1,0,0 });
+		gpu_context.draw_cube_gizmo(b, { 0.1, 0.1, 0.1 }, rigid_body_b.transform.get_rotation(), { 1,0,0 });
+		gpu_context.draw_line_gizmo(a, b, { 1,0,0 });
+
+		glm::vec3 ab = b - a;
+		float ab_length = glm::length2(ab);
+		float x = ab_length - spring_mass.rest_length;
+
+		float force_stiffness = spring_mass.stiffness * x;
+
+		glm::vec3 ab_vel = rigid_body_b.get_velocity() - rigid_body_a.get_velocity();
+
+		glm::vec3 ab_normal = { -1, 0, 0 };
+		if (glm::length(ab) != 0.f)
+		{
+			ab_normal = glm::normalize(ab);
+		}
+
+		float force_dampening = spring_mass.damping * glm::dot(ab_normal, ab_vel);
+
+		float force_total = force_stiffness + force_dampening;
+		glm::vec3 ba = a - b;
+
+		glm::vec3 ba_normal = { 1, 0, 0 };
+		if (glm::length(ba) != 0.f)
+		{
+			ba_normal = glm::normalize(ba);
+		}
+
+		if (!rigid_body_a.is_static)
+		{
+			glm::vec3 impulse_a = force_total * ab_normal * (float)time.get_delta_time();
+			apply_linear_impulse_api(rigid_body_a, impulse_a);
+		}
+
+		if (!rigid_body_b.is_static)
+		{
+			glm::vec3 impulse_b = force_total * ba_normal * (float)time.get_delta_time();
+			apply_linear_impulse_api(rigid_body_b, impulse_b);
+		}
+	}
+}
+
+
+
 void phesycs_impl::tick_integration(peetcs::archetype_pool& pool, pipo& gpu_context)
 {
 	static time_info time;
@@ -695,14 +779,13 @@ void phesycs_impl::tick_integration(peetcs::archetype_pool& pool, pipo& gpu_cont
 	time.tick();
 	time.delta_time *= 1.0f;
 
-	auto query = pool.query<pipo::transform_data, box_collider_data, rigid_body_data>();
+	auto query = pool.query<pipo::transform_data, rigid_body_data>();
 
 	// tick new position and rotation
 	for (auto value : query)
 	{
 		auto& transform = value.get<pipo::transform_data>();
 		auto& rigid_body = value.get<rigid_body_data>();
-		auto& collider = value.get<box_collider_data>();
 
 		rigid_body.transform.set_pos(transform.get_pos());
 		rigid_body.transform.set_rotation(transform.get_rotation());

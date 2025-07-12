@@ -12,6 +12,11 @@ void tick_integration_api(peetcs::archetype_pool& c_pool, pipo& gpu_context)
 	phesycs_impl::tick_integration(c_pool, gpu_context);
 }
 
+void tick_spring_mass_integration_api(peetcs::archetype_pool& c_pool, pipo& gpu_context)
+{
+	phesycs_impl::tick_spring_mass_integration(c_pool, gpu_context);
+}
+
 void tick_collision_response_api(peetcs::archetype_pool& c_pool, pipo& gpu_context)
 {
 	phesycs_impl::tick_collision_response(c_pool, gpu_context);

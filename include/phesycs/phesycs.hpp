@@ -43,6 +43,15 @@ struct phesycs_impl
 
 	};
 
+	struct spring_mass_data 
+	{
+		static constexpr int id = lib_id + 3;
+		peetcs::entity_id b;
+		float stiffness;
+		float damping;
+		float rest_length;
+	};
+
 	struct box_collider_data
 	{
 		static constexpr int id = lib_id + 2;
@@ -50,13 +59,18 @@ struct phesycs_impl
 		pipo::transform_data transform;
 
 		std::array<glm::vec3, 8> vertices;
-		aabb aabb;
+		aabb aabb = {};
+
+		static void load_component(json& component_json, box_collider_data& data, pipo& gpu_context)
+		{
+			pipo::transform_data::load_component(component_json["transform"], data.transform, gpu_context);
+		}
 	};
 
 	struct rigid_body_data
 	{
 		static constexpr int id = lib_id + 1;
-
+		float center_of_mass[3];
 		pipo::transform_data transform;
 		bool is_static = false;
 		float velocity[3];
@@ -70,6 +84,18 @@ struct phesycs_impl
 		{
 			square
 		};
+
+		static void load_component(json& component_json, rigid_body_data& data, pipo& gpu_context)
+		{
+			pipo::transform_data::load_component(component_json["transform"], data.transform, gpu_context);
+			float mass;
+			from_json(component_json,
+				"is_static", data.is_static,
+				"velocity", data.velocity,
+				"angular_velocity", data.angular_velocity,
+				"mass", data.mass);
+		}
+
 
 		void inline set_mass(float mass, const box_collider_data& box_collider)
 		{
@@ -169,4 +195,5 @@ struct phesycs_impl
 
 	static void tick_collision_response(peetcs::archetype_pool& pool, pipo& gpu_context);
 	static void tick_integration(peetcs::archetype_pool& pool, pipo& gpu_context);
+	static void tick_spring_mass_integration(peetcs::archetype_pool& pool, pipo& gpu_context);
 };

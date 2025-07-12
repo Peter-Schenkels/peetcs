@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <vcruntime_typeinfo.h>
 #include <vector>
 
 
@@ -57,7 +58,14 @@ struct element_layout
 		template<typename T>
 		static type_info init()
 		{
-			return type_info { T::id, sizeof(T)};
+			if constexpr (requires { T::id; })
+			{
+				return type_info{ T::id, sizeof(T) };
+			}
+			else
+			{
+				return  type_info{ (hash_t)typeid(T).hash_code(), sizeof(T) };
+			}
 		}
 	};
 

@@ -92,13 +92,13 @@ int main()
 			{
 				pipo::camera_data& camera_data = pool.add<pipo::camera_data>(camera);
 				pipo::transform_data& camera_transform = pool.add<pipo::transform_data>(camera);
-				camera_transform.set_pos(0, 10, 10);
+				camera_transform.set_pos(0, 20, 20);
 				camera_transform.set_rotation(-3.1415 / 4, 0, 0);
 
 				camera_data.c_near = 0.1f;
 				camera_data.c_far = 1000.0f;
 				camera_data.aspect = 1920.f / 1080;
-				camera_data.fov = 40.0f;
+				camera_data.fov = 60.0f;
 				camera_data.type = pipo::view_type::perspective;
 				camera_data.active = i == 0;
 				camera_data.render_target = main_render_target;
@@ -115,7 +115,7 @@ int main()
 
 		{
 			int start_entity = triangle;
-			int amount = 300;
+			int amount = 100;
 			peetcs::entity_id last_entity = 0;
 			// Setup car entities
 			for (int i = triangle; i < amount + start_entity; i++)
@@ -125,7 +125,7 @@ int main()
 				int x = i % dim - dim/2.f;
 				int y = (i / dim) % dim - dim / 2.f;
 				int z = i / (dim * dim);
-				float padding = 1.f;
+				float padding = 6.f;
 				//z = z * padding + z;
 				y = y * padding + y;
 				x = x * padding + x;
@@ -143,13 +143,31 @@ int main()
 
 				phesycs_impl::box_collider_data& box_collider = pool.add<phesycs_impl::box_collider_data>(triangle);
 				box_collider.transform.set_scale(1.0, 1.0, 1.0);
+				box_collider.transform.set_pos(2, 0, 0);
 				auto& rigidbody = pool.add<phesycs_impl::rigid_body_data>(triangle);
 				rigidbody.angular_velocity[0] = 0;
 				rigidbody.angular_velocity[1] = 0;
 				triangle_transform.set_pos(x, -2 + z, y);
+
+				phesycs_impl::box_collider_data& box_collider_2 = pool.add<phesycs_impl::box_collider_data>(triangle);
+				box_collider_2.transform.set_scale(1.0, 1.0, 1.0);
+				box_collider_2.transform.set_pos(0, 0, 0);
+
+				phesycs_impl::box_collider_data& box_collider_3 = pool.add<phesycs_impl::box_collider_data>(triangle);
+				box_collider_3.transform.set_scale(1.0, 1.0, 1.0);
+				box_collider_3.transform.set_pos(2, 2, 0);
+
+				phesycs_impl::box_collider_data& box_collider_4 = pool.add<phesycs_impl::box_collider_data>(triangle);
+				box_collider_4.transform.set_scale(1.0, 1.0, 1.0);
+				box_collider_4.transform.set_pos(2, 4, 0);
+
+				phesycs_impl::box_collider_data& box_collider_5 = pool.add<phesycs_impl::box_collider_data>(triangle);
+				box_collider_5.transform.set_scale(1.0, 1.0, 1.0);
+				box_collider_5.transform.set_pos(2, 6, 0);
+
 				//rigidbody.set_translational_velocity(-glm::normalize(triangle_transform.get_pos()) * 2.f);
 
-				rigidbody.set_mass(100, box_collider);
+				rigidbody.set_mass(100, box_collider_5);
 				rigidbody.is_static = false;
 
 				float scale = 0.5;
@@ -276,6 +294,8 @@ int main()
 				"rotation", transform.rotation,
 				"scale", transform.scale,
 				"parent", transform.parent);
+
+			transform.dirty = true;
 
 			glm::quat rotation = transform.get_rotation();
 

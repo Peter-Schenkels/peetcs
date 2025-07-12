@@ -500,7 +500,7 @@ void resolve_3d_collision(phesycs_impl::rigid_body_data& a, phesycs_impl::rigid_
 
 static void update_collider_data(peetcs::archetype_pool& pool, phesycs_impl::box_collider_data& collider, pipo::transform_data& transform)
 {
-	auto a_ws_matrix = collider.transform.get_local_space() * transform.get_world_space(pool);
+	auto a_ws_matrix =  transform.get_world_space(pool) * collider.transform.get_local_space();
 	collider.vertices = pipo::primitives::cube::vertices;
 
 	collider.aabb.min = glm::vec3(INFINITY);
@@ -554,18 +554,25 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 
 	for (auto body_a : query)
 	{
-		box_collider_data& collider_a = body_a.get<box_collider_data>();
+		box_collider_data* collider_a = &body_a.get<box_collider_data>();
 		pipo::transform_data& transform_a = body_a.get<pipo::transform_data>();
+		generic_container* collider_as = pool.get_list_container<box_collider_data>(body_a.get_id());
+		int collider_list_index_a = 0;
 
 		if (transform_a.parent == peetcs::invalid_entity_id)
 		{
 			a_id++;
 			max_id = std::max(max_id, a_id);
+			//gpu_context.draw_vertices(std::vector(collider_a->vertices.begin(), collider_a->vertices.end()), pipo::primitives::cube::indices, { 1, 0, 0 });
 
-			if (a_id == max_id)
-			{
-				update_collider_data(pool, collider_a, transform_a);
-			}
+
+			// WARNING: Jump label
+			jump_body_a:
+			update_collider_data(pool, *collider_a, transform_a);
+
+			/*if (a_id == max_id)
+			{*/
+			/*}*/
 
 
 			int b_id = -1;
@@ -581,9 +588,10 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 				}
 
 				collision_pair pair = { a_id, b_id };
+				/*
 				if (pairs.contains(pair))
 					continue;
-
+					*/
 
 				// Is not a child transform (not yet supported)
 				pipo::transform_data& transform_b = body_b.get<pipo::transform_data>();
@@ -592,13 +600,20 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 					continue;
 				}
 
-				box_collider_data& collider_b = body_b.get<box_collider_data>();
-				if (b_id == max_id)
-				{
-					update_collider_data(pool, collider_b, transform_b);
-				}
+				box_collider_data* collider_b = &body_b.get<box_collider_data>();
 
-				if (!collider_a.aabb.overlap(collider_b.aabb))
+				generic_container* collider_bs = pool.get_list_container<box_collider_data>(body_b.get_id());
+				int collider_list_index_b = 0;
+
+				// WARNING: Jump label
+				jump_body_b:
+
+				/*if (b_id == max_id)
+				{*/
+					update_collider_data(pool, *collider_b, transform_b);
+				/*}*/
+
+				if (!collider_a->aabb.overlap(collider_b->aabb))
 				{
 					continue;
 				}
@@ -606,10 +621,11 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 
 				collision_test test = {};
 				simplex in_simplex = {};
-				if (gjk(collider_a.vertices, collider_b.vertices, in_simplex))
+				if (gjk(collider_a->vertices, collider_b->vertices, in_simplex))
 				{
-					test = epa<8,8>(collider_a.vertices, collider_b.vertices, in_simplex);
+					test = epa<8,8>(collider_a->vertices, collider_b->vertices, in_simplex);
 					test.collision = true;
+
 
 					//gpu_context.draw_cube_gizmo(test.position, { 0.1,0.1,0.1 }, glm::angleAxis(1.f, test.axis), { 1,0,0 });
 
@@ -618,7 +634,7 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 
 				if (test.collision)
 				{
-					float resolve_amount = 0.5f;
+					float resolve_amount = 0.45f;
 
 					rigid_body_data& a_rigidbody = body_a.get<rigid_body_data>();
 					rigid_body_data& b_rigidbody = body_b.get<rigid_body_data>();
@@ -633,19 +649,42 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 					else if (!a_rigidbody.is_static)
 					{
 						transform_a.set_pos(transform_a.get_pos() + test.axis * test.resolution * -resolve_amount);
-						update_collider_data(pool, collider_a, transform_a);
+						update_collider_data(pool, *collider_a, transform_a);
 					}
 					else if (!b_rigidbody.is_static)
 					{
 						transform_b.set_pos(transform_b.get_pos() + test.axis * test.resolution * resolve_amount);
-						update_collider_data(pool, collider_b, transform_b);
+						update_collider_data(pool, *collider_b, transform_b);
 
 					}
 
 					resolve_3d_collision(a_rigidbody, b_rigidbody, test);
 				}
+
+				if (collider_bs && collider_list_index_b < collider_bs->size())
+				{
+					collider_b = &collider_bs->get_element_at(collider_list_index_b).get<box_collider_data>();
+					collider_list_index_b++;
+
+					// WARNING: Jump label
+					goto jump_body_b;
+				}
+			}
+
+			if (collider_as && collider_list_index_a < collider_as->size())
+			{
+				collider_a = &collider_as->get_element_at(collider_list_index_a).get<box_collider_data>();
+				collider_list_index_a++;
+
+				//gpu_context.draw_vertices(std::vector(collider_a->vertices.begin(), collider_a->vertices.end()), pipo::primitives::cube::indices, { 0, 1, 0 });
+
+
+				// WARNING: Jump label
+				goto jump_body_a;
 			}
 		}
+
+
 	}
 }
 
@@ -678,7 +717,7 @@ void phesycs_impl::tick_integration(peetcs::archetype_pool& pool, pipo& gpu_cont
 			glm::quat deltaRotation = glm::angleAxis(angle, axis);
 
 			// 3. Apply rotation
-			rigid_body.transform.set_rotation(glm::normalize(deltaRotation * rigid_body.transform.get_rotation())); // Apply rotation in world space
+			rigid_body.transform.set_rotation(glm::normalize(deltaRotation * rigid_body.transform.get_rotation())); // Apply rotation in world 
 		}
 
 		// dampening

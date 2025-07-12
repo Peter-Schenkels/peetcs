@@ -36,7 +36,7 @@ namespace peetcs
 		std::unordered_map<entity_id, element_layout>         entity_archetype_lookup;
 		std::vector<add_component_command>                    add_commands;
 		std::vector<remove_component_command>                 remove_commands;
-		// used for storing component lists contigously
+		// used for storing component lists contiguously
 		std::unordered_map<entity_id, std::unordered_map<component_type, generic_container>> list_blocks;
 
 		std::size_t default_array_size = 10000;
@@ -76,6 +76,29 @@ namespace peetcs
 		Component* get_from_owner(const entity_id entity)
 		{
 			return get_at<Component>(entity, 0);
+		}
+
+		template<typename Component>
+		generic_container* get_list_container(const entity_id entity)
+		{
+			const auto& component_type = Component::id;
+			auto entity_containers_it = list_blocks.find(entity);
+			if (entity_containers_it != list_blocks.end())
+			{
+				auto component_list_it = entity_containers_it->second.find(Component::id);
+				if (component_list_it != entity_containers_it->second.end())
+				{
+					return &component_list_it->second;
+				}
+			}
+
+			return {};
+		}
+
+		template<typename Component>
+		bool has_list(const entity_id entity)
+		{
+			return get_list_container<Component>(entity) != nullptr;
 		}
 
 		template<typename Component>

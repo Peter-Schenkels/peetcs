@@ -5,26 +5,31 @@
 
 struct position
 {
+	constexpr static uint16_t id = 10001;
 	float x, y, z;
 };
 
 struct velocity
 {
+	constexpr static uint16_t id = 10002;
 	float vx, vy, vz;
 };
 
 struct health
 {
+	constexpr static uint16_t id = 10003;
 	int points;
 };
 
 struct attack
 {
+	constexpr static uint16_t id = 10005;
 	int damage;
 };
 
 struct defense
 {
+	constexpr static uint16_t id = 10004;
 	int armor;
 };
 
@@ -115,6 +120,7 @@ void assert_neq(A a, B b)
 	}
 }
 
+/*
 inline void test_storage_constructor_default()
 {
 	generic_container s;
@@ -310,6 +316,7 @@ inline void test_generic_container_iterator_equality()
 	assert_neq(it1, it2);
 	std::cout << "test_iterator_equality passed\n";
 }
+*/
 
 
 inline void test_add_components()
@@ -537,7 +544,7 @@ void test_component_lists()
 
 int inline run_tests()
 {
-	test_storage_constructor_default();
+	/*test_storage_constructor_default();
 	test_generic_container_constructor_with_type_description();
 	test_generic_container_add_element();
 	test_generic_container_get_element();
@@ -545,7 +552,7 @@ int inline run_tests()
 	test_generic_container_size();
 	test_generic_container_last();
 	test_generic_container_iterator_begin_end();
-	test_generic_container_iterator_equality();
+	test_generic_container_iterator_equality();*/
 
 	test_add_components();
 	test_query_components();

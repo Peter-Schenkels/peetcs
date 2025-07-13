@@ -440,7 +440,7 @@ void resolve_3d_collision(phesycs_impl::rigid_body_data& a, phesycs_impl::rigid_
 
 
 
-	float elasticity = 0.5;
+	float elasticity = 0.0;
 	float friction = 0.01f;
 
 	glm::vec3 ra = collision.position - phesycs_impl::to_vec3(a.transform.position);
@@ -574,11 +574,12 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 
 			// WARNING: Jump label
 			jump_body_a:
-			update_collider_data(pool, *collider_a, transform_a);
 
-			/*if (a_id == max_id)
-			{*/
-			/*}*/
+			if (a_id == max_id)
+			{
+				update_collider_data(pool, *collider_a, transform_a);
+
+			}
 
 
 			int b_id = -1;
@@ -594,10 +595,10 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 				}
 
 				collision_pair pair = { a_id, b_id };
-				/*
+		
 				if (pairs.contains(pair))
 					continue;
-					*/
+				
 
 				// Is not a child transform (not yet supported)
 				pipo::transform_data& transform_b = body_b.get<pipo::transform_data>();
@@ -614,10 +615,10 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 				// WARNING: Jump label
 				jump_body_b:
 
-				/*if (b_id == max_id)
-				{*/
+				if (b_id == max_id)
+				{
 					update_collider_data(pool, *collider_b, transform_b);
-				/*}*/
+				}
 
 				if (!collider_a->aabb.overlap(collider_b->aabb))
 				{
@@ -640,7 +641,7 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 
 				if (test.collision)
 				{
-					float resolve_amount = 0.45f;
+					float resolve_amount = 0.5f;
 
 					rigid_body_data& a_rigidbody = body_a.get<rigid_body_data>();
 					rigid_body_data& b_rigidbody = body_b.get<rigid_body_data>();
@@ -702,6 +703,8 @@ void phesycs_impl::tick_spring_mass_integration(peetcs::archetype_pool& pool, pi
 	time.tick();
 	time.delta_time *= 1.0f;
 
+	time.delta_time = std::min(1 / 60., time.delta_time);
+
 	auto query = pool.query<pipo::transform_data, rigid_body_data, spring_mass_data>();
 	for (auto query_value : query)
 	{
@@ -745,6 +748,11 @@ void phesycs_impl::tick_spring_mass_integration(peetcs::archetype_pool& pool, pi
 			ab_normal = glm::normalize(ab);
 		}
 
+		if (glm::length(ab_normal) > 1.f)
+		{
+			continue;
+		}
+
 		float force_dampening = spring_mass.damping * glm::dot(ab_normal, ab_vel);
 
 		float force_total = force_stiffness + force_dampening;
@@ -754,6 +762,11 @@ void phesycs_impl::tick_spring_mass_integration(peetcs::archetype_pool& pool, pi
 		if (glm::length(ba) != 0.f)
 		{
 			ba_normal = glm::normalize(ba);
+		}
+
+		if (glm::length(ba_normal) > 1.f)
+		{
+			continue;
 		}
 
 		if (!rigid_body_a.is_static)
@@ -810,7 +823,7 @@ void phesycs_impl::tick_integration(peetcs::archetype_pool& pool, pipo& gpu_cont
 		transform.set_pos(rigid_body.transform.get_pos());
 		transform.set_rotation(rigid_body.transform.get_rotation());
 
-		if (!rigid_body.is_static)
+		if (!rigid_body.is_static && rigid_body.gravity)
 		{
 			rigid_body.set_translational_velocity(rigid_body.get_velocity() + glm::vec3(0, -9.81f * (float)time.delta_time, 0));
 		}

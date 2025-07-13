@@ -73,6 +73,7 @@ struct phesycs_impl
 		float center_of_mass[3];
 		pipo::transform_data transform;
 		bool is_static = false;
+		bool gravity = true;
 		float velocity[3];
 		float angular_velocity[3];
 		float mass = 2;

@@ -156,8 +156,25 @@ add_project(PHESYCS
             SOURCES ${SRC_PHESYCS}
             DEPENDS PEETCS PIPO nlohmann_json::nlohmann_json)
 
+
+# FILE GROUP SRC_APP
+set(SRC_APP
+    "include/app/app.hpp"
+	"src/app/app.cpp"
+)
+
+source_group("App" FILES ${SRC_APP})
+
+# define the target
+add_project(APP
+            STATIC_LIB
+            SOURCES ${SRC_APP}
+            DEPENDS PHESYCS PEETCS PIPO nlohmann_json::nlohmann_json)
+
+
+
 # define the target
 add_project(TESTER
             GUI_APP 
             SOURCES ${SRC_MAIN}
-            DEPENDS PEETCS PIPO PHESYCS nlohmann_json::nlohmann_json)
+            DEPENDS PEETCS PIPO PHESYCS nlohmann_json::nlohmann_json APP)

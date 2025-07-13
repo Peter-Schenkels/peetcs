@@ -83,8 +83,7 @@ public:
 };
 
 
-
-static void draw_json_imgui(json& j, const std::string& key = "root")
+inline void draw_json_imgui(json& j, const std::string& key)
 {
 	if (j.is_object()) 
 	{
@@ -124,7 +123,8 @@ static void draw_json_imgui(json& j, const std::string& key = "root")
 }
 
 
-static bool draw_json_imgui_editable(nlohmann::json& j, const std::string& key = "root") {
+inline bool draw_json_imgui_editable(nlohmann::json& j, const std::string& key = "root")
+{
 	using json = nlohmann::json;
 
 	bool changed = false;
@@ -210,7 +210,7 @@ static bool draw_json_imgui_editable(nlohmann::json& j, const std::string& key =
 
 
 template<typename Arg, typename... Args>
-static bool draw_imgui_val_editable(const char* key, Arg& arg, Args&... args)
+bool draw_imgui_val_editable(const char* key, Arg& arg, Args&... args)
 {
 	bool changed = false;
 	if constexpr (std::is_array_v<Arg>)
@@ -282,7 +282,6 @@ static bool draw_imgui_val_editable(const char* key, Arg& arg, Args&... args)
 }
 
 
-#define NAME_PAR(object, member) #member, object.member
 
 template<typename Arg, typename... Args>
 static bool draw_imgui_editable(const char* key, Arg& arg, Args&... args)

@@ -1,9 +1,46 @@
 #pragma once
 
-#include <numbers>
 #include <vector>
+
+
+using texture_id = unsigned int;
+using shader_id = unsigned int;
+
+struct render_target_id
+{
+	texture_id render_texture_id;
+	unsigned int frame_buffer_id;
+	unsigned int depth_buffer_id;
+
+	bool operator==(const render_target_id& other) const;
+};
+
+
+struct hash_render_target_id
+{
+	size_t operator()(const render_target_id& k) const;
+};
+
+struct mesh_id
+{
+	unsigned int vertex_array_object;
+	unsigned int vertex_buffer_object;
+	unsigned int element_buffer_object;
+	unsigned int nb_of_indices;
+
+
+	bool operator==(const mesh_id& other) const;
+};
+
+struct hash_mesh_id
+{
+	size_t operator()(const mesh_id& k) const;
+};
+
+
+
+#include <numbers>
 #include <array>
-#include <math.h>
 #include <glm/vec3.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -38,31 +75,12 @@
 #endif
 
 
+
+
+
 class pipo
 {
 public:
-	struct mesh_id
-	{
-		unsigned int vertex_array_object;
-		unsigned int vertex_buffer_object;
-		unsigned int element_buffer_object;
-		unsigned int nb_of_indices;
-
-
-		bool operator==(const mesh_id& other) const;
-	};
-
-	using texture_id = unsigned int;
-	using shader_id = unsigned int;
-
-	struct render_target_id
-	{
-		texture_id render_texture_id;
-		unsigned int frame_buffer_id;
-		unsigned int depth_buffer_id;
-
-		bool operator==(const render_target_id& other) const;
-	};
 
 
 	enum class view_type
@@ -83,6 +101,8 @@ public:
 		float c_far;
 		float aspect;
 		bool active;
+
+		static void load_component(json& component_json, camera_data& data, pipo& gpu_context);
 	};
 
 
@@ -94,9 +114,13 @@ public:
 		float scale[3] = { 1, 1, 1 };
 		float rotation[4] = { 0, 0, 0 };
 
+		bool dirty = true;
+		glm::mat4 transform_matrix;
+
 		peetcs::entity_id parent = std::numeric_limits<peetcs::entity_id>::max();
 
 		glm::vec3 get_pos() const;
+		glm::vec3 get_ws_pos(peetcs::archetype_pool& pool);
 		glm::vec3 get_scale() const;
 		glm::quat get_rotation() const;
 		glm::vec3 get_euler_rotation() const;
@@ -108,16 +132,22 @@ public:
 		void set_rotation(const glm::quat& quat);
 		void set_rotation(const glm::vec3& euler);
 
-		glm::mat4 get_local_space() const;
-		glm::mat4 get_world_space(peetcs::archetype_pool& pool) const;
+		glm::mat4 get_local_space();
+		glm::mat4 get_world_space(peetcs::archetype_pool& pool);
+
+		transform_data& get_root_transform(peetcs::archetype_pool& pool);
+
+		static void load_component(json& component_json, transform_data& data, const pipo& gpu_context);
 	};
 
 	struct mesh_renderer_data
 	{
 		constexpr static uint16_t id = 0;
 
-		mesh_id mesh_id;
+		mesh_id mesh;
 		bool visible;
+
+		static void load_component(json& component_json, mesh_renderer_data& data, pipo& gpu_context);
 	};
 
 	struct render_target_renderer_data
@@ -130,6 +160,8 @@ public:
 		int width;
 		render_target_id target_id;
 		bool visible;
+
+		static void load_component(json& component_json, render_target_renderer_data& data, pipo& gpu_context);
 	};
 
 	struct lit_material_data
@@ -138,6 +170,8 @@ public:
 
 		texture_id main_texture;
 		texture_id normal_texture;
+
+		static void load_component(json& component_json, lit_material_data& data, pipo& gpu_context);
 	};
 
 	struct unlit_material_data
@@ -147,6 +181,8 @@ public:
 		texture_id main_texture;
 
 		static shader_id program;
+
+		static void load_component(json& component_json, unlit_material_data& data, pipo& gpu_context);
 	};
 
 	struct material_data
@@ -187,6 +223,7 @@ public:
 			bool           clamp_borders = false;
 			unsigned char* data = nullptr; // optional
 			bool nearest_neighbour = false;
+			std::string_view name;
 		};
 
 		// Instance Data
@@ -257,6 +294,7 @@ public:
 
 		struct allocate_settings
 		{
+			std::string_view name;
 			type target_type;
 			int width;
 			int height;
@@ -293,10 +331,20 @@ public:
 	/// </summary>
 	struct resources
 	{
-		std::unordered_map<texture_id, texture>                textures;
-		std::vector<mesh>                   meshes;
-		std::unordered_map<shader_id,  shader>                 shaders;
-		std::vector<render_target>   render_targets;
+		std::unordered_map<texture_id, texture> textures;
+		std::vector<mesh> meshes;
+		std::unordered_map<shader_id, shader> shaders;
+		std::vector<render_target> render_targets;
+
+		// Loaded resources name mapping
+		std::unordered_map<std::string_view, texture_id> texture_names;
+		std::unordered_map<texture_id, std::string_view> texture_id_names;
+		std::unordered_map<std::string_view, std::vector<mesh_id>> mesh_names;
+		std::unordered_map<mesh_id, std::string_view, hash_mesh_id> mesh_id_names;
+		std::unordered_map<render_target_id, std::string_view, hash_render_target_id> render_target_names;
+		std::unordered_map<std::string_view, render_target_id> name_render_targets;
+
+
 		void* window;
 		int width;
 		int height;
@@ -315,10 +363,12 @@ public:
 	void draw_aabb(const glm::vec3& min, glm::vec3& max, glm::vec3 color);
 	void draw_cube_gizmo(glm::vec3 position, glm::vec3 scale, glm::quat rotation, glm::vec3 color);
 
+	texture_id try_load_texture_gpu(const texture::load_settings& settings);
 	texture_id load_texture_gpu(const texture::load_settings& settings);
 	texture_id allocate_texture_gpu(const texture::allocate_settings& settings);
 	bool       unload_texture_gpu(const texture_id& id);
 
+	void try_load_mesh_gpu(const mesh::load_settings& settings, std::vector<mesh_id>& loaded_meshes);
 	void load_mesh_gpu(const mesh::load_settings& settings, std::vector<mesh_id>& loaded_meshes);
 	mesh_id allocate_mesh_gpu(const mesh::allocate_settings& settings);
 	mesh_id get_quad() const;
@@ -332,6 +382,8 @@ public:
 
 	render_target_id create_render_target(const render_target::allocate_settings& settings);
 	void init_default_resources();
+
+	bool is_key_pressed(int key);
 
 
 	bool init();
@@ -372,44 +424,40 @@ public:
 			static inline mesh::vertex_layout layout = mesh::vertex_layout::debug;
 
 			static inline std::vector<unsigned int> indices{
-				// Front face
-				4, 5, 6,  4, 6, 7,
-				// Back face
-				1, 0, 3,  1, 3, 2,
-				// Left face
-				0, 4, 7,  0, 7, 3,
-				// Right face
-				5, 1, 2,  5, 2, 6,
-				// Top face
-				3, 7, 6,  3, 6, 2,
-				// Bottom face
-				0, 1, 5,  0, 5, 4
+								0, 1, 1, 2, 2, 3, 3, 0,     // fronte
+								0, 6, 6, 7, 7, 1, 1, 0,     // sotto
+								3, 2, 2, 5, 5, 4, 4, 3,     // sopra
+								4, 5, 5, 7, 7, 6, 6, 4,     // retro
+								2, 5, 5, 7, 7, 1, 1, 2,     // destra
+								3, 4, 4, 6, 6, 0, 0, 3      // sinistra
 			};
 
 			static inline std::array<glm::vec3, 8> vertices = {
-				glm::vec3{-1, -1, -1}, // 0
-				glm::vec3{ 1, -1, -1}, // 1
-				glm::vec3{ 1,  1, -1}, // 2
-				glm::vec3{-1,  1, -1}, // 3
-				glm::vec3{-1, -1,  1}, // 4
-				glm::vec3{ 1, -1,  1}, // 5
-				glm::vec3{ 1,  1,  1}, // 6
-				glm::vec3{-1,  1,  1}  // 7
+						  glm::vec3{ -1.f, -1.f,  1.f},      //0
+						  { 1.f, -1.f,  1.f},      //1
+						  { 1.f,  1.f,  1.f},      //2
+						  {-1.f,  1.f,  1.f},      //3
+						  {-1.f,  1.f, -1.f},      //4
+						  { 1.f,  1.f, -1.f},      //5
+						  {-1.f, -1.f, -1.f},      //6
+				{ 1.f, -1.f, -1.f}       //7
 			};
 		};
 	};
 
 private:
-	resources _resources = {};
+	resources _resources;
 	debug _debug = {};
 
 
 	void render_meshes(peetcs::archetype_pool& pool);
 	void render_unlit_material_meshes(peetcs::archetype_pool& pool, const camera_data& camera,
-	                                         const transform_data& camera_transform);
+	                                         transform_data& camera_transform);
 	void render_misc_material_meshes(peetcs::archetype_pool& pool, const camera_data& camera,
-		const transform_data& camera_transform);
+		transform_data& camera_transform);
 };
+
+
 
 inline void pipo::transform_data::set_rotation(const glm::vec3& euler)
 {
@@ -452,18 +500,4 @@ inline glm::vec3 pipo::transform_data::get_pos() const
 {
 	return glm::vec3(position[0], position[1], position[2]);
 }
-
-
-/*#define DECLARE_TYPE_ID(type, idval) \
-	struct type { \
-		static constexpr HASH_VALUE_TYPE id() { return static_cast<HASH_VALUE_TYPE>(idval); } \
-	};*/
-
-/*DECLARE_TYPE_ID(pipo::transform_data, 022)
-DECLARE_TYPE_ID(pipo::mesh_render_data, 1212)
-DECLARE_TYPE_ID(pipo::material_data, 2112)
-DECLARE_TYPE_ID(pipo::unlit_material_data, 312)
-DECLARE_TYPE_ID(pipo::lit_material_data, 412)
-DECLARE_TYPE_ID(pipo::camera_data, 5112)*/
-
 

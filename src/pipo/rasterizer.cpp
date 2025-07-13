@@ -26,22 +26,24 @@
 #include <glm/common.hpp>
 #include <utility>
 
+glm::vec3 clear_color(102, 204, 255);
 
-pipo::shader_id pipo::unlit_material_data::program = {};
 
-/*std::unordered_map<pipo::texture_id, pipo::texture>               pipo::resources::textures = {};
-std::unordered_map<pipo::mesh_id, pipo::mesh>                     pipo::resources::meshes = {};
-std::unordered_map<pipo::shader_id, pipo::shader>                 pipo::resources::shaders = {};
-std::unordered_map<pipo::render_target_id, pipo::render_target>   pipo::resources::render_targets = {};
+shader_id pipo::unlit_material_data::program = {};
+
+/*std::unordered_map<texture_id, pipo::texture>               pipo::resources::textures = {};
+std::unordered_map<mesh_id, pipo::mesh>                     pipo::resources::meshes = {};
+std::unordered_map<shader_id, pipo::shader>                 pipo::resources::shaders = {};
+std::unordered_map<render_target_id, pipo::render_target>   pipo::resources::render_targets = {};
 void*pipo::resources::window = {};
 int   pipo::resources::height = {};
 int   pipo::resources::width = {};
-pipo::shader_id pipo::unlit_material_data::program = -1;
-pipo::mesh_id pipo::resources::quad_mesh = {};
-pipo::shader_id pipo::resources::render_texture_shader = -1;
+shader_id pipo::unlit_material_data::program = -1;
+mesh_id pipo::resources::quad_mesh = {};
+shader_id pipo::resources::render_texture_shader = -1;
 
 std::vector<pipo::debug::debug_draw_call> pipo::debug::queued_draw_calls = {};*/
-pipo::shader_id pipo::debug::debug_shader_id = -1;
+shader_id pipo::debug::debug_shader_id = -1;
 
 
 char vertex_shader_unlit_code[] =
@@ -75,6 +77,7 @@ in vec2 TexCoord;
 in vec3 Normal;
 in vec3 FragPos;  
 uniform sampler2D main_texture;
+uniform vec3 ambient;
 
 float lerp(float v0, float v1, float t) {
   return v0 + t * (v1 - v0);
@@ -89,7 +92,7 @@ void main()
     float diff = max(dot(norm, lightDir), 0.0);
 	float intensity = lerp(0.0, 1, diff);
 	vec3 color = vec3(texture(main_texture, TexCoord));
-	vec3 ambient_color = color * vec3(94f/255f, 156f/255f, 1);
+	vec3 ambient_color = color * ambient;
 	
     FragColor = vec4(lerp(color.r, ambient_color.r, intensity), lerp(color.g, ambient_color.g, intensity), lerp(color.b, ambient_color.b, intensity), 1);
 
@@ -147,19 +150,48 @@ void main(){
 )";
 
 
-bool pipo::mesh_id::operator==(const mesh_id& other) const
+bool render_target_id::operator==(const render_target_id& other) const
+{
+	return other.depth_buffer_id == depth_buffer_id &&
+		other.frame_buffer_id == frame_buffer_id &&
+		other.render_texture_id == render_texture_id;
+}
+
+size_t hash_render_target_id::operator()(const render_target_id& k) const
+{
+	using std::size_t;
+	using std::hash;
+
+	// Compute individual hash values for first,
+	// second and third and combine them using XOR
+	// and bit shifting:
+
+	return ((hash<unsigned int>()(k.depth_buffer_id)
+			^ (hash<unsigned int>()(k.frame_buffer_id) << 1)) >> 1)
+		^ (hash<unsigned int>()(k.render_texture_id) << 1);
+}
+
+bool mesh_id::operator==(const mesh_id& other) const
 {
     return element_buffer_object == other.element_buffer_object &&
         vertex_array_object == other.vertex_array_object &&
         vertex_buffer_object == other.vertex_buffer_object;
 }
 
-bool pipo::render_target_id::operator==(const render_target_id& other) const
+size_t hash_mesh_id::operator()(const mesh_id& k) const
 {
-    return other.depth_buffer_id == depth_buffer_id &&
-        other.frame_buffer_id == frame_buffer_id &&
-        other.render_texture_id == render_texture_id;
+    using std::size_t;
+    using std::hash;
+
+    // Compute individual hash values for first,
+    // second and third and combine them using XOR
+    // and bit shifting:
+
+    return ((hash<unsigned int>()(k.vertex_array_object)
+        ^ (hash<unsigned int>()(k.element_buffer_object) << 1)) >> 1)
+        ^ (hash<unsigned int>()(k.vertex_buffer_object) << 1);
 }
+
 
 
 void pipo::init_default_resources()
@@ -217,7 +249,7 @@ void pipo::init_default_resources()
         char filepath[] = "Assets//Models//quad.obj";
         settings.file_path = filepath;
 
-        std::vector<pipo::mesh_id> meshes;
+        std::vector<mesh_id> meshes;
 		load_mesh_gpu(settings, meshes);
 
         _resources.plane_mesh = meshes.front();
@@ -228,7 +260,7 @@ void pipo::init_default_resources()
         char filepath[] = "Assets//Models//cube.obj";
         settings.file_path = filepath;
 
-        std::vector<pipo::mesh_id> meshes;
+        std::vector<mesh_id> meshes;
 		load_mesh_gpu(settings, meshes);
 
         _resources.cube_mesh = meshes.front();
@@ -239,7 +271,7 @@ void pipo::init_default_resources()
         char filepath[] = "Assets//Models//sphere.obj";
         settings.file_path = filepath;
 
-        std::vector<pipo::mesh_id> meshes;
+        std::vector<mesh_id> meshes;
 		load_mesh_gpu(settings, meshes);
 
         _resources.sphere_mesh = meshes.front();
@@ -254,8 +286,15 @@ void pipo::init_default_resources()
     glFrontFace(GL_CCW);
 }
 
+bool pipo::is_key_pressed(int key)
+{
+    int state = glfwGetKey((GLFWwindow*)_resources.window, key);
+    return state == GLFW_PRESS || state == GLFW_REPEAT;
+}
+
 bool pipo::init()
 {
+    _resources = {};
     _resources.textures = {};
     _resources.meshes = {};
     _resources.shaders = {};
@@ -305,8 +344,21 @@ bool pipo::create_window(int width, int height, const char* title)
     ImGui_ImplGlfw_InitForOpenGL((GLFWwindow*)_resources.window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.05f, 0.05f, 0.05f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.14f, 0.14f, 0.14f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, ImVec4(0.10f, 0.1f, 0.1f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.2f, 0.2f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+
     //glfwSwapInterval(0);
-    glClearColor(94/255.f, 156 / 255.f, 255 / 255.f, 1);
+    glClearColor(clear_color.x / 255.f, clear_color.y / 255.f, clear_color.z / 255.f, 1);
 
     return true;
 }
@@ -421,7 +473,7 @@ bool pipo::start_frame()
     return false;
 }
 
-void pipo::render_misc_material_meshes(peetcs::archetype_pool& pool, const pipo::camera_data& camera, const pipo::transform_data& camera_transform)
+void pipo::render_misc_material_meshes(peetcs::archetype_pool& pool, const pipo::camera_data& camera, pipo::transform_data& camera_transform)
 {
 	glm::mat4 view = get_view(camera_transform);
 	glm::mat4 projection = get_projection(camera);
@@ -452,18 +504,20 @@ void pipo::render_misc_material_meshes(peetcs::archetype_pool& pool, const pipo:
 			camera_uniforms_set = true;
 		}
 
-		const transform_data& transform = query_value.get<transform_data>();
+		transform_data& transform = query_value.get<transform_data>();
         glm::mat4 model = transform.get_world_space(pool);
 		GL_CALL(glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm::value_ptr(model)));
 
 
-		GL_CALL(glBindVertexArray(mesh_renderer.mesh_id.vertex_array_object));
-		glDrawElements(GL_TRIANGLES, mesh_renderer.mesh_id.nb_of_indices, GL_UNSIGNED_INT, 0);
+		GL_CALL(glBindVertexArray(mesh_renderer.mesh.vertex_array_object));
+		glDrawElements(GL_TRIANGLES, mesh_renderer.mesh.nb_of_indices, GL_UNSIGNED_INT, 0);
 		GL_CALL(glBindVertexArray(0));
 	}
 }
 
-void pipo::render_unlit_material_meshes(peetcs::archetype_pool& pool, const pipo::camera_data& camera, const pipo::transform_data& camera_transform)
+
+
+void pipo::render_unlit_material_meshes(peetcs::archetype_pool& pool, const pipo::camera_data& camera, pipo::transform_data& camera_transform)
 {
 	glm::mat4 view = get_view(camera_transform);
 	glm::mat4 projection = get_projection(camera);
@@ -476,6 +530,7 @@ void pipo::render_unlit_material_meshes(peetcs::archetype_pool& pool, const pipo
 	int loc_view = glGetUniformLocation(unlit_material_data::program, "view");
 	int loc_proj = glGetUniformLocation(unlit_material_data::program, "projection");
 	int loc_main_texture = glGetUniformLocation(unlit_material_data::program, "main_texture");
+	int loc_ambient_color = glGetUniformLocation(unlit_material_data::program, "ambient");
 	GL_CALL(glUniform1i(loc_main_texture, 0));
 
 	for (auto query_value : query)
@@ -490,6 +545,7 @@ void pipo::render_unlit_material_meshes(peetcs::archetype_pool& pool, const pipo
 		{
 			GL_CALL(glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm::value_ptr(view)));
 			GL_CALL(glUniformMatrix4fv(loc_proj, 1, GL_FALSE, glm::value_ptr(projection)));
+            GL_CALL(glUniform3f(loc_ambient_color, clear_color.r / 255.f, clear_color.g / 255.f, clear_color.b / 255.f));
 
 			camera_uniforms_set = true;
 		}
@@ -499,13 +555,13 @@ void pipo::render_unlit_material_meshes(peetcs::archetype_pool& pool, const pipo
 		GL_CALL(glBindTexture(GL_TEXTURE_2D, material.main_texture));
 
 
-		const transform_data& transform = query_value.get<transform_data>();
+		transform_data& transform = query_value.get<transform_data>();
 		glm::mat4 model = transform.get_world_space(pool);
 		GL_CALL(glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm::value_ptr(model)));
 
 
-		GL_CALL(glBindVertexArray(mesh_renderer.mesh_id.vertex_array_object));
-		glDrawElements(GL_TRIANGLES, mesh_renderer.mesh_id.nb_of_indices, GL_UNSIGNED_INT, 0);
+		GL_CALL(glBindVertexArray(mesh_renderer.mesh.vertex_array_object));
+		glDrawElements(GL_TRIANGLES, mesh_renderer.mesh.nb_of_indices, GL_UNSIGNED_INT, 0);
 		GL_CALL(glBindVertexArray(0));
 	}
 }
@@ -534,7 +590,7 @@ void pipo::render_meshes(peetcs::archetype_pool& pool)
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         }
 
-        const transform_data& camera_transform = camera_value.get<transform_data>();
+        transform_data& camera_transform = camera_value.get<transform_data>();
 
         render_misc_material_meshes(pool, camera, camera_transform);
         render_unlit_material_meshes(pool, camera, camera_transform);
@@ -571,8 +627,21 @@ void pipo::render_frame(peetcs::archetype_pool& pool)
     GL_CALL(glViewport(0, 0, _resources.width, _resources.height));
 
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    glfwPollEvents();
 }
 
+
+glm::vec3 pipo::transform_data::get_ws_pos(peetcs::archetype_pool& pool)
+{
+    transform_data* parent_transform = pool.get_from_owner<transform_data>(parent);
+    if (!parent_transform) // safety check
+    {
+        return get_pos();
+    }
+
+    glm::mat4 parent_ws_matrix = parent_transform->get_world_space(pool);
+    return parent_ws_matrix * glm::vec4(get_pos(), 1.f);
+}
 
 glm::vec3 pipo::transform_data::get_euler_rotation() const
 {
@@ -581,6 +650,8 @@ glm::vec3 pipo::transform_data::get_euler_rotation() const
 
 void pipo::transform_data::set_pos(glm::vec3 pos)
 {
+    dirty = true;
+
     position[0] = pos.x;
     position[1] = pos.y;
     position[2] = pos.z;
@@ -588,18 +659,26 @@ void pipo::transform_data::set_pos(glm::vec3 pos)
 
 void pipo::transform_data::set_rotation(const glm::quat& quat)
 {
+    dirty = true;
+
     rotation[0] = quat.w;
     rotation[1] = quat.x;
     rotation[2] = quat.y;
     rotation[3] = quat.z;
 }
 
-glm::mat4 pipo::transform_data::get_local_space() const
+glm::mat4 pipo::transform_data::get_local_space()
 {
-    return get_model(*this);
+    if (dirty)
+    {
+        transform_matrix = get_model(*this);
+        dirty = false;
+    }
+
+    return transform_matrix;
 }
 
-glm::mat4 pipo::transform_data::get_world_space(peetcs::archetype_pool& pool) const
+glm::mat4 pipo::transform_data::get_world_space(peetcs::archetype_pool& pool)
 {
     if (parent == std::numeric_limits<peetcs::entity_id>::max())
     {
@@ -615,6 +694,129 @@ glm::mat4 pipo::transform_data::get_world_space(peetcs::archetype_pool& pool) co
     glm::mat4 parent_ws_matrix = parent_transform->get_world_space(pool);
 
     return parent_ws_matrix * get_local_space();
+}
+
+pipo::transform_data& pipo::transform_data::get_root_transform(peetcs::archetype_pool& pool)
+{
+	if (parent != peetcs::invalid_entity_id)
+	{
+        transform_data* parent_transform = pool.get_from_owner<transform_data>(parent);
+        if (parent_transform != nullptr)
+        {
+            return parent_transform->get_root_transform(pool);
+        }
+	}
+
+    return *this;
+}
+
+
+void pipo::camera_data::load_component(json& component_json, camera_data& data, pipo& gpu_context)
+{
+    char* render_target_name;
+
+    from_json(component_json,
+        NAME_PAR(data, type),
+        "render_target", render_target_name,
+        NAME_PAR(data, c_near),
+        NAME_PAR(data, c_far),
+        NAME_PAR(data, aspect),
+        NAME_PAR(data, active));
+
+    if (const auto it = gpu_context._resources.name_render_targets.find(render_target_name); 
+        it != gpu_context._resources.name_render_targets.end())
+    {
+        data.render_target = it->second;
+    }
+    else
+    {
+        assert(false);
+    }
+}
+
+void pipo::transform_data::load_component(json& component_json, transform_data& data, const pipo& gpu_context)
+{
+	from_json(component_json,
+	          "position", data.position,
+	          "scale", data.scale,
+	          "rotation", data.rotation,
+	          "parent", data.parent);
+}
+
+void pipo::mesh_renderer_data::load_component(json& component_json, mesh_renderer_data& data, pipo& gpu_context)
+{
+	char* mesh_to_load;
+	int mesh_index;
+
+	from_json(component_json,
+	          "visible", data.visible,
+	          "file_path", mesh_to_load,
+	          "mesh_index", mesh_index
+	);
+
+	mesh::load_settings settings;
+	settings.file_path = mesh_to_load;
+
+	std::vector<mesh_id> meshes;
+	gpu_context.try_load_mesh_gpu(settings, meshes);
+
+	if (meshes.size() <= mesh_index)
+	{
+		assert(false);
+	}
+
+	data.mesh = meshes[mesh_index];
+}
+
+void pipo::render_target_renderer_data::load_component(json& component_json, render_target_renderer_data& data,
+	pipo& gpu_context)
+{
+    from_json(component_json,
+        NAME_PAR(data, x),
+        NAME_PAR(data, y),
+        NAME_PAR(data, height),
+        NAME_PAR(data, width),
+        NAME_PAR(data, visible));
+
+    pipo::render_target::allocate_settings render_target_settings = {};
+    render_target_settings.width = data.width;
+    render_target_settings.height = data.height;
+
+    render_target_id render_target = gpu_context.create_render_target(render_target_settings);
+    data.target_id = render_target;
+}
+
+void pipo::lit_material_data::load_component(json& component_json, lit_material_data& data, pipo& gpu_context)
+{
+    char* normal_texture_name;
+    char* main_texture_name;
+
+    from_json(component_json,
+        "main_texture", main_texture_name,
+        "normal_texture", normal_texture_name);
+
+	if (auto it = gpu_context._resources.texture_names.find(main_texture_name); it != gpu_context._resources.texture_names.end())
+	{
+        data.main_texture = it->second;
+	}
+
+	if (auto it = gpu_context._resources.texture_names.find(normal_texture_name); it != gpu_context._resources.texture_names.end())
+	{
+        data.normal_texture = it->second;
+	}
+}
+
+void pipo::unlit_material_data::load_component(json& component_json, unlit_material_data& data, pipo& gpu_context)
+{
+    char* main_texture_name;
+
+    from_json(component_json,
+        "main_texture", main_texture_name);
+
+    if (auto it = gpu_context._resources.texture_names.find(main_texture_name); it != gpu_context._resources.texture_names.end())
+    {
+        data.main_texture = it->second;
+    }
 }
 
 
@@ -765,7 +967,7 @@ void pipo::debug::clear_draw_calls()
     queued_draw_calls.clear();
 }
 
-pipo::texture_id pipo::load_texture_gpu(const texture::load_settings& settings)
+texture_id pipo::load_texture_gpu(const texture::load_settings& settings)
 {
     texture::allocate_settings allocate_settings = {};
     allocate_settings.generate_mipmaps = true;
@@ -774,6 +976,7 @@ pipo::texture_id pipo::load_texture_gpu(const texture::load_settings& settings)
 
     // load texture to cpu
     allocate_settings.data = stbi_load(settings.file_path, &allocate_settings.width, &allocate_settings.height, &allocate_settings.nb_of_channels, 0);
+    allocate_settings.name = settings.file_path;
 
     // Load texture on gpu
     const texture_id id = allocate_texture_gpu(allocate_settings);
@@ -784,7 +987,7 @@ pipo::texture_id pipo::load_texture_gpu(const texture::load_settings& settings)
     return id;
 }
 
-pipo::texture_id pipo::allocate_texture_gpu(const texture::allocate_settings& settings)
+texture_id pipo::allocate_texture_gpu(const texture::allocate_settings& settings)
 {
     texture loaded_texture = {};
     glGenTextures(1, &loaded_texture.id);
@@ -838,6 +1041,8 @@ pipo::texture_id pipo::allocate_texture_gpu(const texture::allocate_settings& se
     }
 
     _resources.textures.try_emplace(loaded_texture.id, loaded_texture);
+    _resources.texture_names.try_emplace(settings.name, loaded_texture.id);
+    _resources.texture_id_names.try_emplace(loaded_texture.id, settings.name);
 
     return loaded_texture.id;
 }
@@ -851,6 +1056,18 @@ bool pipo::unload_texture_gpu(const texture_id& id)
     }
 
     return false;
+}
+
+void pipo::try_load_mesh_gpu(const mesh::load_settings& settings, std::vector<mesh_id>& loaded_meshes)
+{
+    if (auto it = _resources.mesh_names.find(settings.file_path); it != _resources.mesh_names.end())
+    {
+        loaded_meshes = it->second;
+    }
+    else
+    {
+        load_mesh_gpu(settings, loaded_meshes);
+    }
 }
 
 void pipo::load_mesh_gpu(const mesh::load_settings& settings, std::vector<mesh_id>& loaded_meshes)
@@ -902,7 +1119,7 @@ void pipo::load_mesh_gpu(const mesh::load_settings& settings, std::vector<mesh_i
     std::cout << "ERROR: Failed to load OBJ File" << std::endl;;
 }
 
-pipo::mesh_id pipo::allocate_mesh_gpu(const mesh::allocate_settings& settings)
+mesh_id pipo::allocate_mesh_gpu(const mesh::allocate_settings& settings)
 {
     mesh_id id = {};
 
@@ -1034,22 +1251,22 @@ pipo::mesh_id pipo::allocate_mesh_gpu(const mesh::allocate_settings& settings)
     return allocated_mesh.id;
 }
 
-pipo::mesh_id pipo::get_quad() const
+mesh_id pipo::get_quad() const
 {
     return _resources.quad_mesh;
 }
 
-pipo::mesh_id pipo::get_plane() const
+mesh_id pipo::get_plane() const
 {
     return _resources.plane_mesh;
 }
 
-pipo::mesh_id pipo::get_sphere() const
+mesh_id pipo::get_sphere() const
 {
     return _resources.sphere_mesh;
 }
 
-pipo::mesh_id pipo::get_cube() const
+mesh_id pipo::get_cube() const
 {
     return _resources.cube_mesh;
 }
@@ -1065,7 +1282,7 @@ bool pipo::unload_mesh_gpu(const mesh_id& id)
     return true;
 }
 
-pipo::shader_id pipo::load_shader_gpu(const shader::load_settings& settings)
+shader_id pipo::load_shader_gpu(const shader::load_settings& settings)
 {
     shader::allocate_settings allocate_settings = {};
 
@@ -1083,7 +1300,7 @@ pipo::shader_id pipo::load_shader_gpu(const shader::load_settings& settings)
     return {};
 }
 
-pipo::shader_id pipo::create_shader_gpu(const shader::allocate_settings& settings)
+shader_id pipo::create_shader_gpu(const shader::allocate_settings& settings)
 {
     shader compiled_shader = {};
 
@@ -1147,7 +1364,7 @@ pipo::shader_id pipo::create_shader_gpu(const shader::allocate_settings& setting
     return compiled_shader.id;
 }
 
-pipo::render_target_id pipo::create_render_target(const render_target::allocate_settings& settings)
+render_target_id pipo::create_render_target(const render_target::allocate_settings& settings)
 {
     render_target_id render_target_id = {};
     glGenFramebuffers(1, &render_target_id.frame_buffer_id);
@@ -1158,6 +1375,7 @@ pipo::render_target_id pipo::create_render_target(const render_target::allocate_
     texture_allocate_settings.height = settings.height;
     texture_allocate_settings.nearest_neighbour = true;
     texture_allocate_settings.clamp_borders = false;
+    texture_allocate_settings.name = settings.name;
 
     switch (settings.target_type)
     {
@@ -1203,6 +1421,8 @@ pipo::render_target_id pipo::create_render_target(const render_target::allocate_
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     _resources.render_targets.push_back(render_target_instanced);
+    _resources.name_render_targets[settings.name] = render_target_id;
+    _resources.render_target_names[render_target_id] = std::string_view(settings.name);
 
     return render_target_id;
 }

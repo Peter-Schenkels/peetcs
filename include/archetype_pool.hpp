@@ -62,6 +62,7 @@ namespace peetcs
 			*static_cast<Component*>(command.component_data) = Component{};
 
 			add_commands.push_back(command);
+
 			return *static_cast<Component*>(command.component_data);
 		}
 

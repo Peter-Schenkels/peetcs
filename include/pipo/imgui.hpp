@@ -7,6 +7,8 @@
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 #include "include/utilities.hpp"
+#include <glm/vec3.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 class gui_interface
 {
@@ -265,6 +267,10 @@ bool draw_imgui_val_editable(const char* key, Arg& arg, Args&... args)
 	else if constexpr (std::is_same_v<Arg, unsigned>)
 	{
 		changed |= ImGui::InputScalar(key, ImGuiDataType_U32, &arg);
+	}
+	else if constexpr (std::is_same_v<Arg, glm::vec3>)
+	{
+		changed |= ImGui::InputFloat3(key, glm::value_ptr(arg));
 	}
 	else
 	{

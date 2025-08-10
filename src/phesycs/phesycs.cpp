@@ -11,31 +11,7 @@
 #undef min
 #undef max
 
-// ======================= AABB =============================
-
-
-bool aabb::overlap(const glm::vec3& point) const
-{
-	return (min.x <= point.x) && (point.x < max.x) &&
-		(min.y <= point.y) && (point.y < max.y) &&
-		(min.z <= point.z) && (point.z < max.z);
-}
-
-bool aabb::overlap(const aabb& other) const
-{
-	return min.x <= other.max.x &&
-		max.x >= other.min.x &&
-		min.y <= other.max.y &&
-		max.y >= other.min.y &&
-		min.z <= other.max.z &&
-		max.z >= other.min.z;
-}
-
-bool aabb::inside(const aabb& other) const
-{
-	return overlap(other.min) && overlap(other.max);
-}
-
+static bool debug_visuals = false;
 
 // ======================= GJK =============================
 
@@ -234,6 +210,8 @@ static inline bool handle_simplex(simplex& simplex, glm::vec3& direction)
 	return false;
 }
 
+
+// Based on: https://winter.dev/articles/gjk-algorithm
 template<typename ItA, typename ItB>
 static bool gjk(const ItA& a, const ItB& b, simplex& simplex)
 {
@@ -283,8 +261,17 @@ struct collision_test
 
 face make_face(int a, int b, int c, const std::vector<support>& polytope)
 {
-	glm::vec3 normal = glm::normalize(glm::cross(polytope[b].c - polytope[a].c, polytope[c].c - polytope[a].c));
+	glm::vec3 ab = polytope[b].c - polytope[a].c;
+	glm::vec3 ac = polytope[c].c - polytope[a].c;
+
+	glm::vec3 normal = glm::normalize(glm::cross(ab, ac));
+
+	// Ensure normal points outward (away from origin)
+	if (glm::dot(normal, polytope[a].c) < 0.0f)
+		normal = -normal;
+
 	float distance = glm::dot(normal, polytope[a].c);
+
 	return face{ a, b, c, normal, distance };
 }
 
@@ -294,43 +281,101 @@ void add_edge(int a, int b, std::vector<edge>& edge_list)
 	auto it = std::find(edge_list.begin(), edge_list.end(), e);
 	if (it != edge_list.end())
 	{
-		// Edge already exists (reverse direction) → remove it
+		// Edge already exists (reverse direction): remove it
 		edge_list.erase(it);
 	}
 	else
 	{
-		// New edge → add it
+		// New edge: add it
 		edge_list.push_back(e);
 	}
 };
 
+struct ContactPoints {
+	glm::vec3 contactA;
+	glm::vec3 contactB;
+};
 
-static glm::vec3 compute_worldspace_collision(const support& A, const support& B, const support& C, const support& P)
+static glm::vec3 closest_point_on_triangle_to_origin(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c)
 {
-	// From: https://gamedev.stackexchange.com/a/23745
+	// Edge vectors
+	glm::vec3 ab = b - a;
+	glm::vec3 ac = c - a;
+	glm::vec3 ap = -a;
 
-	// First calculate barycentric coordinates for support point P
+	float d1 = glm::dot(ab, ap);
+	float d2 = glm::dot(ac, ap);
+
+	if (d1 <= 0.0f && d2 <= 0.0f) return a; // Closest to a
+
+	glm::vec3 bp = -b;
+	float d3 = glm::dot(ab, bp);
+	float d4 = glm::dot(ac, bp);
+	if (d3 >= 0.0f && d4 <= d3) return b; // Closest to b
+
+	float vc = d1 * d4 - d3 * d2;
+	if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
+	{
+		float v = d1 / (d1 - d3);
+		return a + v * ab; // Closest to ab edge
+	}
+
+	glm::vec3 cp = -c;
+	float d5 = glm::dot(ab, cp);
+	float d6 = glm::dot(ac, cp);
+	if (d6 >= 0.0f && d5 <= d6) return c; // Closest to c
+
+	float vb = d5 * d2 - d1 * d6;
+	if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
+	{
+		float w = d2 / (d2 - d6);
+		return a + w * ac; // Closest to ac edge
+	}
+
+	float va = d3 * d6 - d5 * d4;
+	if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
+	{
+		float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+		return b + w * (c - b); // Closest to bc edge
+	}
+
+	// Inside face
+	float denom = 1.0f / (va + vb + vc);
+	float v = vb * denom;
+	float w = vc * denom;
+	return a + ab * v + ac * w;
+}
+
+
+glm::vec3 compute_worldspace_collision(const support& A, const support& B, const support& C)
+{
+	// Step 1: Project origin onto the triangle
+	glm::vec3 p = closest_point_on_triangle_to_origin(A.c, B.c, C.c);
+
+	// Step 2: Compute barycentric coordinates of p w.r.t. triangle A.c, B.c, C.c
 	glm::vec3 v0 = B.c - A.c;
 	glm::vec3 v1 = C.c - A.c;
-	glm::vec3 v2 = P.c - A.c;
+	glm::vec3 v2 = p - A.c;
 
 	float d00 = glm::dot(v0, v0);
 	float d01 = glm::dot(v0, v1);
 	float d11 = glm::dot(v1, v1);
 	float d20 = glm::dot(v2, v0);
 	float d21 = glm::dot(v2, v1);
-
 	float denom = d00 * d11 - d01 * d01;
+
 	float v = (d11 * d20 - d01 * d21) / denom;
 	float w = (d00 * d21 - d01 * d20) / denom;
 	float u = 1.0f - v - w;
 
-	// Transform barycoords to ws
+	// Step 3: Interpolate original world-space support points
 	glm::vec3 contactA = u * A.a + v * B.a + w * C.a;
+	glm::vec3 contactB = u * A.b + v * B.b + w * C.b;
+
 	return contactA;
 }
 
-
+// Based on: https://allenchou.net/2013/12/game-physics-contact-generation-epa/
 template<int ASize, int BSize, typename ItA, typename ItB>
 collision_test epa(const ItA& a, const ItB& b, simplex& simplex)
 {
@@ -393,7 +438,7 @@ collision_test epa(const ItA& a, const ItB& b, simplex& simplex)
 			glm::vec3 contactB = p.b;
 
 			result.collision = true;
-			result.position = compute_worldspace_collision(polytope[f.a], polytope[f.b], polytope[f.c], p);
+			result.position = compute_worldspace_collision(polytope[f.a], polytope[f.b], polytope[f.c]);
 			result.axis = f.normal;
 			result.resolution = d;
 
@@ -431,17 +476,16 @@ collision_test epa(const ItA& a, const ItB& b, simplex& simplex)
 	return result;
 }
 
+// Source: https://research.ncl.ac.uk/game/mastersdegree/gametechnologies/previousinformation/physics6collisionresponse/2017%20Tutorial%206%20-%20Collision%20Response.pdf
 void resolve_3d_collision(phesycs_impl::rigid_body_data& a, phesycs_impl::rigid_body_data& b, const collision_test& collision)
 {
+	
 	if (glm::length(collision.axis) == 0.f)
 	{
 		return;
 	}
 
-
-
 	float elasticity = 0.0;
-	float friction = 0.01f;
 
 	glm::vec3 ra = collision.position - phesycs_impl::to_vec3(a.transform.position);
 	glm::vec3 rb = collision.position - phesycs_impl::to_vec3(b.transform.position);
@@ -472,7 +516,7 @@ void resolve_3d_collision(phesycs_impl::rigid_body_data& a, phesycs_impl::rigid_
 	float j = -(1.0f + elasticity) * vel_along_normal / denom;
 
 	// Final impulse vector in world space
-	glm::vec3 impulse = j * normal;
+	glm::vec3 impulse = j * collision.axis;
 
 	if (!a.is_static)
 	{
@@ -486,22 +530,44 @@ void resolve_3d_collision(phesycs_impl::rigid_body_data& a, phesycs_impl::rigid_
 		apply_angular_impulse_api(b, impulse, rb);
 	}
 
-	// Friction
-	/*if (!a.is_static)
-	{
-		float a_friction = friction * (1.f - abs(glm::dot(glm::normalize(impulse), glm::normalize(a.get_velocity()))));
-		float a_angular_friction = friction * (1.f - abs(glm::dot(glm::normalize(impulse), glm::normalize(a.get_angular_velocity()))));
-		a.set_translational_velocity(a.get_velocity() * (1.f - a_friction));
-		a.set_angular_velocity(a.get_angular_velocity() * (1.f - a_angular_friction));
-	}
+	va = phesycs_impl::to_vec3(a.velocity) + cross(phesycs_impl::to_vec3(a.angular_velocity), ra);
+	vb = phesycs_impl::to_vec3(b.velocity) + cross(phesycs_impl::to_vec3(b.angular_velocity), rb);
 
-	if (!b.is_static)
+	relative_velocity = vb - va;
+	vel_along_normal = glm::dot(relative_velocity, normal);
+
+	// Friction
+	glm::vec3 tangent = relative_velocity - collision.axis * vel_along_normal;
+	float tangent_length = glm::length(tangent);
+	if (tangent_length > 1e-6f)
 	{
-		float b_friction = friction * (1.f - abs(glm::dot(glm::normalize(impulse), glm::normalize(b.get_velocity()))));
-		float b_angular_friction = friction * (1.f - abs(glm::dot(glm::normalize(impulse), glm::normalize(b.get_angular_velocity()))));
-		b.set_translational_velocity(b.get_velocity() * (1.f - b_friction));
-		b.set_angular_velocity(b.get_angular_velocity() * (1.f - b_angular_friction));
-	}*/
+		tangent = tangent / tangent_length;
+		float frictional_mass = 
+			(a.is_static ? 0.f : a.inverse_mass) +
+			(b.is_static ? 0.f : b.inverse_mass) + glm::dot(tangent,
+				glm::cross(inv_tern_a * glm::cross(ra, tangent), ra) +
+				glm::cross(inv_tern_b * glm::cross(rb, tangent), rb));
+
+		if (frictional_mass > 0.f)
+		{
+			float friction_coeff = a.friction * b.friction;
+			float jt = (- glm::dot(relative_velocity, tangent) * friction_coeff) / frictional_mass;
+
+
+			if (!a.is_static)
+			{
+				a.set_translational_velocity(a.get_velocity() - tangent * (jt * a.get_inverse_inertia()));
+				a.set_angular_velocity(a.get_angular_velocity() - a.get_inverse_inertia() * glm::cross(ra, tangent * jt));
+			}
+
+			if (!b.is_static)
+			{
+				b.set_translational_velocity(b.get_velocity() + tangent * (jt * b.get_inverse_inertia()));
+				b.set_angular_velocity(b.get_angular_velocity() + b.get_inverse_inertia() * glm::cross(rb, tangent * jt));
+			}
+
+		}
+	}
 }
 
 static void update_collider_data(peetcs::archetype_pool& pool, phesycs_impl::box_collider_data& collider, pipo::transform_data& transform)
@@ -569,8 +635,10 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 		{
 			a_id++;
 			max_id = std::max(max_id, a_id);
-			//gpu_context.draw_vertices(std::vector(collider_a->vertices.begin(), collider_a->vertices.end()), pipo::primitives::cube::indices, { 1, 0, 0 });
-
+			if (debug_visuals)
+			{
+				gpu_context.draw_vertices(std::vector(collider_a->vertices.begin(), collider_a->vertices.end()), pipo::primitives::cube::indices, { 1, 0, 0 });
+			}
 
 			// WARNING: Jump label
 			jump_body_a:
@@ -578,9 +646,7 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 			if (a_id == max_id)
 			{
 				update_collider_data(pool, *collider_a, transform_a);
-
 			}
-
 
 			int b_id = -1;
 			for (auto body_b : query)
@@ -633,8 +699,10 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 					test = epa<8,8>(collider_a->vertices, collider_b->vertices, in_simplex);
 					test.collision = true;
 
-
-					//gpu_context.draw_cube_gizmo(test.position, { 0.1,0.1,0.1 }, glm::angleAxis(1.f, test.axis), { 1,0,0 });
+					if (debug_visuals)
+					{
+						gpu_context.draw_cube_gizmo(test.position, { 0.1,0.1,0.1 }, glm::angleAxis(1.f, test.axis), { 1,0,0 });
+					}
 
 					pairs.emplace(pair);
 				}
@@ -646,21 +714,26 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 					rigid_body_data& a_rigidbody = body_a.get<rigid_body_data>();
 					rigid_body_data& b_rigidbody = body_b.get<rigid_body_data>();
 
-					//gpu_context.draw_aabb(a_aabb.min, a_aabb.max, { 0,0,1 });
+					if (debug_visuals)
+					{
+						//gpu_context.draw_aabb(a_aabb.min, a_aabb.max, { 0,0,1 });
+					}
 
 					if (!a_rigidbody.is_static && !b_rigidbody.is_static)
 					{
 						transform_a.set_pos(transform_a.get_pos() + test.axis * test.resolution * -resolve_amount);
 						transform_b.set_pos(transform_b.get_pos() + test.axis * test.resolution * resolve_amount);
+						update_collider_data(pool, *collider_a, transform_a);
+						update_collider_data(pool, *collider_b, transform_b);
 					}
 					else if (!a_rigidbody.is_static)
 					{
-						transform_a.set_pos(transform_a.get_pos() + test.axis * test.resolution * -resolve_amount);
+						transform_a.set_pos(transform_a.get_pos() + test.axis * test.resolution * -resolve_amount * 2.f);
 						update_collider_data(pool, *collider_a, transform_a);
 					}
 					else if (!b_rigidbody.is_static)
 					{
-						transform_b.set_pos(transform_b.get_pos() + test.axis * test.resolution * resolve_amount);
+						transform_b.set_pos(transform_b.get_pos() + test.axis * test.resolution * resolve_amount * 2.f);
 						update_collider_data(pool, *collider_b, transform_b);
 
 					}
@@ -683,15 +756,15 @@ void phesycs_impl::tick_collision_response(peetcs::archetype_pool& pool, pipo& g
 				collider_a = &collider_as->get_element_at(collider_list_index_a).get<box_collider_data>();
 				collider_list_index_a++;
 
-				//gpu_context.draw_vertices(std::vector(collider_a->vertices.begin(), collider_a->vertices.end()), pipo::primitives::cube::indices, { 0, 1, 0 });
-
+				if (debug_visuals)
+				{
+					//gpu_context.draw_vertices(std::vector(collider_a->vertices.begin(), collider_a->vertices.end()), pipo::primitives::cube::indices, { 0, 1, 0 });
+				}
 
 				// WARNING: Jump label
 				goto jump_body_a;
 			}
 		}
-
-
 	}
 }
 
@@ -729,10 +802,7 @@ void phesycs_impl::tick_spring_mass_integration(peetcs::archetype_pool& pool, pi
 
 		glm::vec3 a = transform_a.get_ws_pos(pool);
 		glm::vec3 b = transform_b_ptr->get_ws_pos(pool);
-
-		gpu_context.draw_cube_gizmo(a, { 0.1, 0.1, 0.1 }, rigid_body_a.transform.get_rotation(), { 1,0,0 });
-		gpu_context.draw_cube_gizmo(b, { 0.1, 0.1, 0.1 }, rigid_body_b.transform.get_rotation(), { 1,0,0 });
-		gpu_context.draw_line_gizmo(a, b, { 1,0,0 });
+		gpu_context.draw_line_gizmo(a, b, { 00.1,00.1,0.3 });
 
 		glm::vec3 ab = b - a;
 		float ab_length = glm::length2(ab);
@@ -742,7 +812,7 @@ void phesycs_impl::tick_spring_mass_integration(peetcs::archetype_pool& pool, pi
 
 		glm::vec3 ab_vel = rigid_body_b.get_velocity() - rigid_body_a.get_velocity();
 
-		glm::vec3 ab_normal = { -1, 0, 0 };
+		glm::vec3 ab_normal = { -1.f, 0, 0 };
 		if (glm::length(ab) != 0.f)
 		{
 			ab_normal = glm::normalize(ab);
@@ -773,14 +843,33 @@ void phesycs_impl::tick_spring_mass_integration(peetcs::archetype_pool& pool, pi
 		{
 			glm::vec3 impulse_a = force_total * ab_normal * (float)time.get_delta_time();
 			apply_linear_impulse_api(rigid_body_a, impulse_a);
+
+
+			glm::vec3 forward = glm::cross(ab_normal, glm::cross(ab_normal, { 1,0,0 }));
+			glm::quat lerped = glm::quatLookAt(forward, {0, 1, 0 });
+
+			//transform_a.set_rotation(glm::mix(transform_a.get_rotation(), lerped, glm::min(1.f, (float)time.get_delta_time() *2.f)));
 		}
 
 		if (!rigid_body_b.is_static)
 		{
 			glm::vec3 impulse_b = force_total * ba_normal * (float)time.get_delta_time();
 			apply_linear_impulse_api(rigid_body_b, impulse_b);
+			//apply_angular_impulse_api(rigid_body_b, impulse_b, ba);
+
+			float t = 0.5f;     // interpolation factor [0..1]
+
+			glm::quat lerped = glm::quatLookAt(ab_normal, { 0, 1, 0 });
+			//transform_b_ptr->set_rotation(glm::mix(transform_b_ptr->get_rotation(), lerped, 0.5f));
+			//transform_b_ptr->set_rotation(glm::mix(transform_b_ptr->get_rotation(), lerped, 0.5f));
+
 		}
 	}
+}
+
+void phesycs_impl::set_debug_visuals(bool enabled)
+{
+	debug_visuals = enabled;
 }
 
 

@@ -22,6 +22,11 @@ void tick_collision_response_api(peetcs::archetype_pool& c_pool, pipo& gpu_conte
 	phesycs_impl::tick_collision_response(c_pool, gpu_context);
 }
 
+void set_debug_visuals_api(bool enabled)
+{
+	phesycs_impl::set_debug_visuals(enabled);
+}
+
 // Apply a linear impulse directly to the center of mass
 void apply_linear_impulse_api(phesycs_impl::rigid_body_data& body, const glm::vec3& impulse)
 {

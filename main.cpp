@@ -17,6 +17,12 @@ struct platform_data
 	constexpr static uint16_t id = 123;
 };
 
+struct claw_data
+{
+
+	constexpr static uint16_t id = 124;
+};
+
 int main()
 {
 	peetcs::archetype_pool pool;
@@ -68,6 +74,15 @@ int main()
 		cable_texture = rasterizer.load_texture_gpu(texture_settings);
 	}
 
+	texture_id claw_texture;
+	{
+		pipo::texture::load_settings texture_settings;
+		texture_settings.nearest_neighbour = true;
+		char texture_filepath[] = R"(Assets\textures\claw.png)";
+		texture_settings.file_path = texture_filepath;
+		claw_texture = rasterizer.load_texture_gpu(texture_settings);
+	}
+
 	texture_id claw_machine_texture;
 	{
 		pipo::texture::load_settings texture_settings;
@@ -77,12 +92,38 @@ int main()
 		claw_machine_texture = rasterizer.load_texture_gpu(texture_settings);
 	}
 
+	texture_id radio_texture;
+	{
+		pipo::texture::load_settings texture_settings;
+		texture_settings.nearest_neighbour = true;
+		char texture_filepath[] = R"(Assets\textures\radio.png)";
+		texture_settings.file_path = texture_filepath;
+		radio_texture = rasterizer.load_texture_gpu(texture_settings);
+	}
+
+	std::vector<mesh_id> radio_mesh;
+	{
+		pipo::mesh::load_settings mesh_settings;
+		char mesh_filepath[] = R"(Assets\models\radio.obj)";
+		mesh_settings.file_path = mesh_filepath;
+		rasterizer.load_mesh_gpu(mesh_settings, radio_mesh);
+	}
+
+
 	std::vector<mesh_id> carkel_mesh;
 	{
 		pipo::mesh::load_settings mesh_settings;
 		char mesh_filepath[] = R"(Assets\models\carkel.obj)";
 		mesh_settings.file_path = mesh_filepath;
 		rasterizer.load_mesh_gpu(mesh_settings, carkel_mesh);
+	}
+
+	std::vector<mesh_id> claw_mesh;
+	{
+		pipo::mesh::load_settings mesh_settings;
+		char mesh_filepath[] = R"(Assets\models\claw.obj)";
+		mesh_settings.file_path = mesh_filepath;
+		rasterizer.load_mesh_gpu(mesh_settings, claw_mesh);
 	}
 
 	std::vector<mesh_id> claw_machine_mesh;
@@ -146,78 +187,82 @@ int main()
 		}
 	}
 
-
 	peetcs::entity_id block = camera + 1;
 
+	// Setup block entities
+	int i = 0;
+	int max = 100;
+	for (int x = -3; x < 4; x++)
 	{
-		int start_entity = block;
-
-		int amount = 30;
-		peetcs::entity_id last_entity = 0;
-		// Setup block entities
-		for (int i = block; i < amount + start_entity; i++)
+		for (int y = 0; y < 9; y++)
 		{
-			block = i + 1;
-			int dim = pow(amount, 1.f / 3.f);
-			int x = i % dim - dim / 2.f;
-			int y = (i / dim) % dim - dim / 2.f;
-			int z = (float)i / (dim * dim);
-			float padding = 1.f;
-			//z = z * padding + z;
-			y = y * padding + y;
-			x = x * padding + x;
-			z = z * padding + z;
+			for (int z = 0; z <4; z++)
+			{
+				block = i + 2;
 
-			pipo::mesh_renderer_data& mesh_render = pool.add<pipo::mesh_renderer_data>(block);
-			//mesh_render.mesh_id = rasterizer.get_quad();
-			mesh_render.mesh = rasterizer.get_cube();
-			mesh_render.visible = true;
+				float padding = 2.f;
+				//z = z * padding + z;
+				float  y_pos = (float)y * padding + (float)y;
+				float x_pos = (float)x * padding + (float)x;
+				float z_pos = (float)z * padding + (float)z;
 
-			pipo::unlit_material_data& material = pool.add<pipo::unlit_material_data>(block);
-			material.main_texture = cube_texture;
+				pipo::mesh_renderer_data& mesh_render = pool.add<pipo::mesh_renderer_data>(block);
+				//mesh_render.mesh_id = rasterizer.get_quad();
+				mesh_render.mesh = rasterizer.get_cube();
+				mesh_render.visible = true;
 
-			pipo::transform_data& triangle_transform = pool.add<pipo::transform_data>(block);
-			float scale =1.f;
-			triangle_transform.set_scale(scale, scale, scale);
+				pipo::unlit_material_data& material = pool.add<pipo::unlit_material_data>(block);
+				material.main_texture = cube_texture;
 
-			phesycs_impl::box_collider_data& box_collider = pool.add<phesycs_impl::box_collider_data>(block);
-			box_collider.transform.set_scale(1.0, 1.0, 1.0);
-			box_collider.transform.set_pos(0, 0, 0);
-			auto& rigidbody = pool.add<phesycs_impl::rigid_body_data>(block);
-			rigidbody.set_angular_velocity({ 0.22 + i,1,1 });
-			rigidbody.set_mass(1, box_collider);
-			triangle_transform.set_pos(x, -2 + z, y);
+				pipo::transform_data& triangle_transform = pool.add<pipo::transform_data>(block);
+				float scale = 1.f;
 
+				phesycs_impl::box_collider_data& box_collider = pool.add<phesycs_impl::box_collider_data>(block);
+				box_collider.transform.set_scale(1.0, 1.0, 1.0);
+				box_collider.transform.set_pos(0, 0, 0);
 
-			// Disabled composite collisions for now
-			/*
-			phesycs_impl::box_collider_data& box_collider_2 = pool.add<phesycs_impl::box_collider_data>(triangle);
-			box_collider_2.transform.set_scale(1.0, 1.0, 1.0);
-			box_collider_2.transform.set_pos(0, 0, 0);
+				if (i % 2)
+				{
+					box_collider.transform.set_pos(0, 0.5, 0);
+					box_collider.transform.set_scale(0.5, 0.45, 1.);
+					mesh_render.mesh = radio_mesh.front();
+					material.main_texture = radio_texture;
+					scale = 2.f;
+				}
 
-			phesycs_impl::box_collider_data& box_collider_3 = pool.add<phesycs_impl::box_collider_data>(triangle);
-			box_collider_3.transform.set_scale(1.0, 1.0, 1.0);
-			box_collider_3.transform.set_pos(2, 2, 0);
-
-			phesycs_impl::box_collider_data& box_collider_4 = pool.add<phesycs_impl::box_collider_data>(triangle);
-			box_collider_4.transform.set_scale(1.0, 1.0, 1.0);
-			box_collider_4.transform.set_pos(2, 4, 0);
-
-			phesycs_impl::box_collider_data& box_collider_5 = pool.add<phesycs_impl::box_collider_data>(triangle);
-			box_collider_5.transform.set_scale(1.0, 1.0, 1.0);
-			box_collider_5.transform.set_pos(2, 6, 0);
-			*/
-
-			//rigidbody.set_translational_velocity(-glm::normalize(triangle_transform.get_pos()) * 2.f);
-
-			/*rigidbody.set_mass(100, box_collider_5);
-			rigidbody.is_static = false;*/
+				triangle_transform.set_scale(scale, scale, scale);
 
 
 
-			pool.emplace_commands();
+
+				auto& rigidbody = pool.add<phesycs_impl::rigid_body_data>(block);
+				//rigidbody.set_angular_velocity({ 0.22 + i,1,1 });
+				rigidbody.set_mass(0.1, box_collider);
+				triangle_transform.set_pos(x_pos, -2 + y_pos, z_pos);
+
+				pool.emplace_commands();
+
+				i++;
+
+
+				if (i == max)
+				{
+					break;
+				}
+			}
+
+			if (i == max)
+			{
+				break;
+			}
+		}
+
+		if (i == max)
+		{
+			break;
 		}
 	}
+
 	peetcs::entity_id platform = block;
 
 	peetcs::entity_id x_claw_arm_bar = platform + 1;
@@ -251,7 +296,7 @@ int main()
 	peetcs::entity_id y_claw_arm_bar = x_claw_arm_bar + 1;
 	{
 		pipo::mesh_renderer_data& claw_arm_bar_renderer = pool.add<pipo::mesh_renderer_data>(y_claw_arm_bar);
-		claw_arm_bar_renderer.visible = true;
+		claw_arm_bar_renderer.visible = false;
 		claw_arm_bar_renderer.mesh = rasterizer.get_cube();
 
 		pipo::transform_data& claw_arm_bar_transform = pool.add<pipo::transform_data>(y_claw_arm_bar);
@@ -263,21 +308,15 @@ int main()
 		pipo::unlit_material_data& material = pool.add<pipo::unlit_material_data>(y_claw_arm_bar);
 		material.main_texture = cube_texture;
 
-		phesycs_impl::box_collider_data& claw_arm_bar_collider = pool.add<phesycs_impl::box_collider_data>(y_claw_arm_bar);
-		claw_arm_bar_collider.transform = {};
-		float scale = 1.f;
-		claw_arm_bar_collider.transform.set_scale(scale, scale, scale);
-
 
 		phesycs_impl::rigid_body_data& claw_arm_bar_rigidbody = pool.add<phesycs_impl::rigid_body_data>(y_claw_arm_bar);
 		claw_arm_bar_rigidbody.is_static = true;
 		claw_arm_bar_rigidbody.gravity = false;
-		claw_arm_bar_rigidbody.set_mass(100, claw_arm_bar_collider);
 
 		pool.emplace_commands();
 	}
 
-
+	peetcs::entity_id claw = 0;
 	peetcs::entity_id claw_machine = y_claw_arm_bar + 1;
 	{
 		auto& transform = pool.add<pipo::transform_data>(claw_machine);
@@ -294,10 +333,6 @@ int main()
 		material.main_texture = claw_machine_texture;
 
 		pool.emplace_commands();
-
-		auto render_data = pool.get_from_owner<pipo::mesh_renderer_data>(claw_machine);
-		render_data->mesh = claw_machine_mesh.front();
-		render_data->visible = true;
 	}
 
 
@@ -305,17 +340,15 @@ int main()
 	glm::vec3 claw_pos = transform_data->get_ws_pos(pool);
 
 	float spring_length = 0.1;
-	float spring_stiffnes = 400;
-	float spring_damping = 100;
+	float spring_stiffnes = 800;
+	float spring_damping = 10;
 
 	peetcs::entity_id cable = claw_machine;
 	int amount_of_chains = 10;
 	for (int i = 1; i < amount_of_chains; i++)
 	{
 		cable = claw_machine + i;
-		pipo::mesh_renderer_data& cable_mesh_renderer = pool.add<pipo::mesh_renderer_data>(cable);
-		cable_mesh_renderer.visible = true;
-		cable_mesh_renderer.mesh = rasterizer.get_cube();
+
 
 		pipo::transform_data& cable_transform = pool.add<pipo::transform_data>(cable);
 		cable_transform.set_pos(claw_pos.x, -i * 1.5 + claw_pos.y, claw_pos.z);
@@ -327,12 +360,10 @@ int main()
 		cable_collider.transform.set_scale(1, 1, 1);
 		cable_collider.transform.set_rotation(0, 0, 0);
 
-		pipo::unlit_material_data& material = pool.add<pipo::unlit_material_data>(cable);
-		material.main_texture = cable_texture;
-
 		phesycs_impl::rigid_body_data& cable_rigidbody = pool.add<phesycs_impl::rigid_body_data>(cable);
 		cable_rigidbody.set_mass(1, cable_collider);
 		cable_rigidbody.is_static = false;
+
 
 		phesycs_impl::spring_mass_data& spring_mass = pool.add<phesycs_impl::spring_mass_data>(cable);
 
@@ -348,13 +379,48 @@ int main()
 		spring_mass.rest_length = spring_length;
 		spring_mass.stiffness = spring_stiffnes;
 
-		if (i == amount_of_chains - 1)
+		if (i == amount_of_chains - 2)
 		{
-			cable_transform.set_scale(1, 1, 1);
-			cable_rigidbody.set_mass(100, cable_collider);
+			cable_collider.transform.set_scale(0, 0, 0);
 		}
 
-		pool.emplace_commands();
+		if (i == amount_of_chains - 1)
+		{
+			claw = cable;
+
+			pipo::mesh_renderer_data& cable_mesh_renderer = pool.add<pipo::mesh_renderer_data>(claw);
+			cable_mesh_renderer.visible = true;
+			cable_mesh_renderer.mesh = claw_mesh.front();
+
+			pipo::unlit_material_data& material = pool.add<pipo::unlit_material_data>(claw);
+			material.main_texture = claw_texture;
+
+			cable_collider.transform.set_scale(1, 3, 1);
+			cable_collider.transform.set_pos(0, -2, 0);
+
+			cable_transform.set_scale(1, 1, 1);
+			cable_rigidbody.set_mass(100, cable_collider);
+
+
+			pool.add<claw_data>(claw);
+			pool.emplace_commands();
+
+
+			/*
+			auto render_data = pool.get_from_owner<pipo::mesh_renderer_data>(claw);
+			render_data->visible = true;
+			render_data->mesh = claw_mesh.front();*/
+
+			/*
+			material = *pool.get_from_owner<pipo::unlit_material_data>(claw);
+			material.main_texture = claw_texture;*/
+
+		}
+		else
+		{
+			pool.emplace_commands();
+		}
+
 	}
 
 	peetcs::entity_id colliders = cable + 1;
@@ -378,37 +444,37 @@ int main()
 
 		switch (i)
 		{
-		case 0:
+		case 0: // Collider Back
 			colliders_transform.set_pos(-0.5, 1, -4.5);
 			colliders_transform.set_scale(12.5, 30, 1);
 			colliders_transform.set_rotation(0, 0, 0);
 			colliders_mesh_renderer.visible = false;
 			break;
-		case 1:
-			colliders_transform.set_pos(-14, 4, 0);
+		case 1: // Collider left
+			colliders_transform.set_pos(-13.60, 4, 0);
 			colliders_transform.set_scale(1,30,10);
 			colliders_transform.set_rotation(0, 0, 0);
 			colliders_mesh_renderer.visible = false;
 			break;
-		case 2:
-			colliders_transform.set_pos(13, 4, 0);
+		case 2: // Collider Right
+			colliders_transform.set_pos(12.650, 4, 0);
 			colliders_transform.set_scale(1, 30, 10);
 			colliders_transform.set_rotation(0, 0, 0);
 			colliders_mesh_renderer.visible = false;
 			break;
-		case 3:
-			colliders_transform.set_pos(-0.5, 1,11);
+		case 3: // Collider Front
+			colliders_transform.set_pos(-0.5, 1,10.5);
 			colliders_transform.set_scale(12.5, 30, 1);
 			colliders_transform.set_rotation(0, 0, 0);
 			colliders_mesh_renderer.visible = false;
 			break;
-		case 4:
-			colliders_transform.set_pos(4.5,-7.9,0);
-			colliders_transform.set_scale(7.5,3,10);
+		case 4: // Collider botton - right / front
+			colliders_transform.set_pos(4,-7.9,0);
+			colliders_transform.set_scale(8,3,10);
 			colliders_transform.set_rotation(0, 0, 0);
 			colliders_mesh_renderer.visible = false;
 			break;
-		case 5:
+		case 5: // Collider bottom - left / back
 			colliders_transform.set_pos(-5.5,-7.9,-0.9);
 			colliders_transform.set_scale(7.5,3,4);
 			colliders_transform.set_rotation(0, 0, 0);
@@ -427,10 +493,10 @@ int main()
 		std::make_unique<dll_reloader<phesycs>>()
 	};
 
-	phesycs::load_dll();
+	//phesycs::load_dll();
 	time_info time;
 
-
+	aabb bounds = { {-11,-3,-1}, {10,30,10} };
 	// Do game ticks
 	while (rasterizer.start_frame())
 	{
@@ -504,21 +570,47 @@ int main()
 			dir_x += glm::vec3{1, 0, 0};
 		}
 
+
+
+		float min[3] = { bounds.min.x, bounds.min.y, bounds.min.z };
+		float max[3] = { bounds.max.x, bounds.max.y, bounds.max.z };
+
+		draw_imgui_editable("Bounds",
+			"Min", bounds.min,
+			"Max", bounds.max);
+
+		rasterizer.draw_aabb(bounds.min, bounds.max, {0, 0, 1});
+
 		if (length(dir_x) > 0)
 		{
 			float speed = 3;
 			dir_x = normalize(dir_x);
 			auto* platform_transform = pool.get_from_owner<pipo::transform_data>(x_claw_arm_bar);
+
+			glm::vec3 last_pos = platform_transform->get_pos();
 			platform_transform->set_pos(
 				platform_transform->get_pos() + dir_x * static_cast<float>(time.get_delta_time()) * speed);
+
+			glm::vec3 current_pos = platform_transform->get_pos();
+
+			if (!bounds.overlap(current_pos))
+			{
+				platform_transform->set_pos(last_pos);
+			}
 		}
 		if (length(dir_y) > 0)
 		{
 			float speed = 3.f/10.f;
 			dir_y = normalize(dir_y);
 			auto* platform_transform = pool.get_from_owner<pipo::transform_data>(y_claw_arm_bar);
+			glm::vec3 last_pos = platform_transform->get_pos();
 			platform_transform->set_pos(
 				platform_transform->get_pos() + dir_y * static_cast<float>(time.get_delta_time()) * speed);
+			glm::vec3 current_pos = platform_transform->get_ws_pos(pool);
+			if (!bounds.overlap(current_pos))
+			{
+				platform_transform->set_pos(last_pos);
+			}
 		}
 
 		// Claw machine Y controls
@@ -546,6 +638,19 @@ int main()
 		if (phesycs::loaded)
 		{
 			phesycs::tick(pool, rasterizer);
+		}
+
+		pipo::transform_data* claw_transform = pool.get_from_owner<pipo::transform_data>(claw);
+		phesycs_impl::box_collider_data* claw_rigidbody = pool.get_from_owner<phesycs_impl::box_collider_data>(claw);
+		if (claw_transform && claw_rigidbody)
+		{
+			draw_imgui_editable("Claw Collider Transform",
+				"position", claw_rigidbody->transform.position,
+				"rotation", claw_rigidbody->transform.rotation,
+				"scale", claw_rigidbody->transform.scale);
+			claw_rigidbody->transform.dirty = true;
+			
+			rasterizer.draw_vertices(std::vector<glm::vec3>(claw_rigidbody->vertices.begin(), claw_rigidbody->vertices.end()), pipo::primitives::cube::indices, { 0, 1, 0 });
 		}
 
 		rasterizer.end_imgui();

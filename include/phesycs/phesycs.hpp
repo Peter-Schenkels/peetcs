@@ -12,9 +12,27 @@ struct aabb
 	glm::vec3 min;
 	glm::vec3 max;
 
-	bool overlap(const glm::vec3& point) const;
-	bool overlap(const aabb& other) const;
-	bool inside(const aabb& other) const;
+	bool overlap(const glm::vec3& point) const
+	{
+		return (min.x <= point.x) && (point.x < max.x) &&
+			(min.y <= point.y) && (point.y < max.y) &&
+			(min.z <= point.z) && (point.z < max.z);
+	}
+
+	bool overlap(const aabb& other) const
+	{
+		return min.x <= other.max.x &&
+			max.x >= other.min.x &&
+			min.y <= other.max.y &&
+			max.y >= other.min.y &&
+			min.z <= other.max.z &&
+			max.z >= other.min.z;
+	}
+
+	bool inside(const aabb& other) const
+	{
+		return overlap(other.min) && overlap(other.max);
+	}
 };
 
 
@@ -79,6 +97,7 @@ struct phesycs_impl
 		float mass = 2;
 		float inverse_mass = 1.f / 2.f;
 		float inverse_inertia[3 * 3];
+		float friction = 0.5f;
 
 
 		enum class type
@@ -197,4 +216,5 @@ struct phesycs_impl
 	static void tick_collision_response(peetcs::archetype_pool& pool, pipo& gpu_context);
 	static void tick_integration(peetcs::archetype_pool& pool, pipo& gpu_context);
 	static void tick_spring_mass_integration(peetcs::archetype_pool& pool, pipo& gpu_context);
+	static void set_debug_visuals(bool enabled);
 };

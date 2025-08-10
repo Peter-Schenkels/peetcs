@@ -47,6 +47,8 @@ struct hash_mesh_id
 #include "imgui.hpp"
 #include "include/archetype_pool.hpp"
 
+#undef max
+
 #undef NDEBUG
 #ifdef NDEBUG
 #define GL_CALL(x) x
@@ -142,7 +144,7 @@ public:
 
 	struct mesh_renderer_data
 	{
-		constexpr static uint16_t id = 0;
+		constexpr static uint16_t id = 8 ;
 
 		mesh_id mesh;
 		bool visible;

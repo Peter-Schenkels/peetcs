@@ -11,6 +11,7 @@ DECLARE_API_FUNC(tick_spring_mass_integration, void, peetcs::archetype_pool&, pi
 DECLARE_API_FUNC(tick_collision_response, void, peetcs::archetype_pool&, pipo&)
 DECLARE_API_FUNC(apply_linear_impulse, void, phesycs_impl::rigid_body_data&, const glm::vec3&)
 DECLARE_API_FUNC(apply_angular_impulse, void, phesycs_impl::rigid_body_data&, const glm::vec3&, const glm::vec3&)
+DECLARE_API_FUNC(set_debug_visuals, void, bool)
 
 struct phesycs
 {
@@ -21,12 +22,15 @@ struct phesycs
 	inline static float system_time;
 	inline static time_info current_time;
 
+	inline static bool debug_visuals = false;
+
 	static int load_dll()
 	{
 		API_LOAD_DLL(PHESYCS)
 		API_DEFINE_FUNC(tick_integration)
 		API_DEFINE_FUNC(tick_collision_response)
 		API_DEFINE_FUNC(tick_spring_mass_integration)
+		API_DEFINE_FUNC(set_debug_visuals)
 		API_DEFINE_FUNC(apply_linear_impulse)
 		API_DEFINE_FUNC(apply_angular_impulse)
 
@@ -54,11 +58,14 @@ struct phesycs
 		}
 
 		float system_time_fps = 1.f / system_time;
+
+
 		draw_imgui_editable("Phesycs performance:", 
 			"tick time", system_time,
-			"tick FPS", system_time_fps);
+			"tick FPS", system_time_fps,
+			"Enable visuals", debug_visuals);
 
-
+		set_debug_visuals_ptr(debug_visuals);
 	}
 
 	// Apply a linear impulse directly to the center of mass

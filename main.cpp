@@ -1,4 +1,5 @@
 #define GLEW_STATIC
+#include <fstream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
@@ -7,6 +8,7 @@
 
 #include <math.h>
 #include <numbers>
+#include <regex>
 
 #include "include/pipo/imgui.hpp"
 #include "include/pipo/rasterizer.hpp"
@@ -19,9 +21,11 @@ struct platform_data
 
 struct claw_data
 {
-
 	constexpr static uint16_t id = 124;
 };
+
+
+using node_id = size_t;
 
 int main()
 {
@@ -570,8 +574,6 @@ int main()
 			dir_x += glm::vec3{1, 0, 0};
 		}
 
-
-
 		float min[3] = { bounds.min.x, bounds.min.y, bounds.min.z };
 		float max[3] = { bounds.max.x, bounds.max.y, bounds.max.z };
 
@@ -583,7 +585,7 @@ int main()
 
 		if (length(dir_x) > 0)
 		{
-			float speed = 3;
+			float speed = 5;
 			dir_x = normalize(dir_x);
 			auto* platform_transform = pool.get_from_owner<pipo::transform_data>(x_claw_arm_bar);
 
@@ -625,7 +627,7 @@ int main()
 		}
 		if (rise != 0)
 		{
-			float speed = -3.f;
+			float speed = -5.f;
 			auto spring_query = pool.query<phesycs_impl::spring_mass_data>();
 			for (auto query_val : spring_query)
 			{

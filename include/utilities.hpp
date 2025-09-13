@@ -2,7 +2,6 @@
 #include <chrono>
 #include <string>
 
-#include "pipo/imgui.hpp"
 #include <nlohmann/json.hpp>
 #include <type_traits>
 
@@ -51,6 +50,20 @@ struct time_info
 };
 
 
+
+template<typename T>
+static void serialize_data(std::stringstream& stream, const T& data)
+{
+	
+}
+
+template<typename T>
+static void deserialize_data(std::stringstream& stream, const T& data)
+{
+
+}
+
+#define NAME_PAR(object, member) #member, object.member
 using json = nlohmann::json;
 
 template<typename Arg, typename...Args>

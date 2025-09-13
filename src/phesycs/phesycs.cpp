@@ -848,7 +848,7 @@ void phesycs_impl::tick_spring_mass_integration(peetcs::archetype_pool& pool, pi
 			glm::vec3 forward = glm::cross(ab_normal, glm::cross(ab_normal, { 1,0,0 }));
 			glm::quat lerped = glm::quatLookAt(forward, {0, 1, 0 });
 
-			//transform_a.set_rotation(glm::mix(transform_a.get_rotation(), lerped, glm::min(1.f, (float)time.get_delta_time() *2.f)));
+			transform_a.set_rotation(glm::mix(transform_a.get_rotation(), lerped, glm::min(1.f, (float)time.get_delta_time() *2.f)));
 		}
 
 		if (!rigid_body_b.is_static)

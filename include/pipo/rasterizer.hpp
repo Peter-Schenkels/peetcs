@@ -84,11 +84,16 @@ class pipo
 {
 public:
 
-
 	enum class view_type
 	{
 		perspective,
 		orthographic
+	};
+
+	enum class focus_type
+	{
+		in_focus,
+		lost_focus,
 	};
 
 	// interface data
@@ -346,7 +351,6 @@ public:
 		std::unordered_map<render_target_id, std::string_view, hash_render_target_id> render_target_names;
 		std::unordered_map<std::string_view, render_target_id> name_render_targets;
 
-
 		void* window;
 		int width;
 		int height;
@@ -356,7 +360,6 @@ public:
 		mesh_id cube_mesh;
 		mesh_id sphere_mesh;
 		shader_id render_texture_shader;
-
 	};
 
 	void draw_line_gizmo(glm::vec3 a, glm::vec3 b, glm::vec3 color);
@@ -450,7 +453,7 @@ public:
 private:
 	resources _resources;
 	debug _debug = {};
-
+	focus_type current_focus;
 
 	void render_meshes(peetcs::archetype_pool& pool);
 	void render_unlit_material_meshes(peetcs::archetype_pool& pool, const camera_data& camera,
